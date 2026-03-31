@@ -1,4 +1,4 @@
-#include "boost/exception/exception.hpp"
+#include "boost/asio/buffers_iterator.hpp"
 #include <boost/asio.hpp>
 #include <boost/asio/completion_condition.hpp>
 #include <boost/asio/detail/std_fenced_block.hpp>
@@ -9,9 +9,9 @@
 #include <boost/asio/streambuf.hpp>
 #include <boost/system/error_code.hpp>
 #include <cstddef>
-#include <exception>
 #include <iostream>
 #include <istream>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <ostream>
@@ -27,6 +27,7 @@ public:
   std::string method;
   std::string body;
   std::string path;
+  std::string transfer_encoded_string;
   std::map<std::string, std::string> request_parsed;
   bool keepALive = false;
 };
@@ -137,112 +138,185 @@ protected:
       Incoming_unprocessed_request = conn->req;
     };
     std::shared_ptr<Request> Incoming_unprocessed_request;
-    std::map<FILTERS, std::function<void(std::shared_ptr<Request>)>> filters = {
+    std::map<FILTERS, std::function<void(std::shared_ptr<Request>,
+                                         std::function<void()>)>>
+        filters = {
 
-        {FILTERS::PARSE_HEADER,
-         [this](std::shared_ptr<Request> req) {
-           boost::asio::async_read_until(
-               this->conn->conn_socket, req->request_buffer, "\r\n\r\n",
-               [this, req](const boost::system::error_code &error,
-                           std::size_t bytes_transferred) {
-                 if (!error) {
+            {FILTERS::PARSE_HEADER,
+             [this](std::shared_ptr<Request> req, auto next) {
+               boost::asio::async_read_until(
+                   this->conn->conn_socket, req->request_buffer, "\r\n\r\n",
+                   [this, req, next](const boost::system::error_code &error,
+                                     std::size_t bytes_transferred) {
+                     if (!error) {
 
-                   std::string line(bytes_transferred, '\0');
-                   std::istream is(&req->request_buffer);
-                   is.read(line.data(), bytes_transferred);
-                   req->request_buffer.consume(bytes_transferred);
+                       std::string line(bytes_transferred, '\0');
+                       std::istream is(&req->request_buffer);
+                       is.read(line.data(), bytes_transferred);
+                       req->request_buffer.consume(bytes_transferred);
 
-                   std::istream iss(&req->request_buffer);
-                   std::string request_line;
-                   std::getline(
-                       iss,
-                       request_line); // first line: GET /index?x=1 HTTP/1.1
+                       std::istream iss(&req->request_buffer);
+                       std::string request_line;
+                       std::getline(
+                           iss,
+                           request_line); // first line: GET /index?x=1 HTTP/1.1
 
-                   std::string full_path;
-                   std::istringstream rl(request_line);
-                   rl >> conn->req->method >> full_path >> conn->req->version;
-                   // Extract path and query
-                   auto qpos = full_path.find("?");
-                   conn->req->path = (qpos != std::string::npos)
-                                         ? full_path.substr(0, qpos)
-                                         : full_path;
+                       std::string full_path;
+                       std::istringstream rl(request_line);
+                       rl >> conn->req->method >> full_path >>
+                           conn->req->version;
+                       // Extract path and query
+                       auto qpos = full_path.find("?");
+                       conn->req->path = (qpos != std::string::npos)
+                                             ? full_path.substr(0, qpos)
+                                             : full_path;
 
-                   if (qpos != std::string::npos) {
-                     size_t aepos = full_path.find("=", qpos);
-                     if (aepos != std::string::npos) {
-                       std::string line;
-                       auto cur = qpos + 1;
-                       while (aepos != std::string::npos) {
-                         auto apos = full_path.find("&", aepos);
-                         if (apos == std::string::npos)
-                           apos = full_path.length();
-                         auto k1 = full_path.substr(cur, aepos - cur);
-                         auto v1 =
-                             full_path.substr(aepos + 1, apos - aepos - 1);
-                         cur = apos + 1;
-                         aepos = full_path.find("=", cur);
+                       if (qpos != std::string::npos) {
+                         size_t aepos = full_path.find("=", qpos);
+                         if (aepos != std::string::npos) {
+                           std::string line;
+                           auto cur = qpos + 1;
+                           while (aepos != std::string::npos) {
+                             auto apos = full_path.find("&", aepos);
+                             if (apos == std::string::npos)
+                               apos = full_path.length();
+                             auto k1 = full_path.substr(cur, aepos - cur);
+                             auto v1 =
+                                 full_path.substr(aepos + 1, apos - aepos - 1);
+                             cur = apos + 1;
+                             aepos = full_path.find("=", cur);
 
-                         req->request_parsed[k1] = v1;
+                             req->request_parsed[k1] = v1;
+                           }
+                         }
                        }
+
+                       bool te_flag = 0;
+                       bool sse_flag = 0;
+
+                       // header_parsing done here we will add the extra
+                       // required modules here accordingly
+                       while (std::getline(iss, request_line)) {
+                         std::cout << request_line << std::endl;
+                         auto e_pos = request_line.find(":");
+
+                         if (e_pos == -1)
+                           break;
+
+                         req->request_parsed[request_line.substr(0, e_pos)] =
+                             request_line.substr(e_pos + 2,
+                                                 request_line.length() - e_pos -
+                                                     2 - 1);
+                         if (request_line.substr(0, e_pos) ==
+                                 "Transfer-Encoding" &&
+                             request_line.substr(e_pos + 2,
+                                                 request_line.length() - e_pos -
+                                                     2 - 1) == "chunked") {
+                           this->filter_chain.push_back(
+                               FILTERS::TRANSFER_ENCODING);
+                           req->keepALive = true;
+                         }
+                         if (request_line.substr(0, e_pos) == "Content-Type" &&
+                             request_line.substr(
+                                 e_pos + 2, request_line.length() - e_pos - 2 -
+                                                1) == "text/event-stream") {
+                           this->filter_chain.push_back(FILTERS::SSE);
+                           req->keepALive = true;
+                         }
+                       }
+
+                       std::cout << "remaining possible body buffer:"
+                                 << conn->reader.size() << std::endl;
+                       next();
+                     } else {
+                       std::cout << "Error at parsing:" << error.message()
+                                 << std::endl;
                      }
-                   }
+                   });
+             }},
 
-                   bool te_flag = 0;
-                   bool sse_flag = 0;
+            {FILTERS::TRANSFER_ENCODING,
+             [this](std::shared_ptr<Request> req, auto next) {
+               std::function<void()> read_transfer_encoding;
+               read_transfer_encoding = [this, req, read_transfer_encoding,
+                                         next]() {
+                 boost::asio::async_read_until(
+                     this->conn->conn_socket, req->request_buffer, "\r\n",
+                     [this, req, read_transfer_encoding,
+                      next](const boost::system::error_code &ec,
+                            size_t bytes_size) {
+                       if (!ec) {
+                         std::istream iss(&req->request_buffer);
+                         std::string line;
+                         std::getline(iss, line);
+                         int chunk_length;
+                         if (line.back() == '\r')
+                           line.pop_back();
+                         try {
+                           chunk_length = std::stoul(line, nullptr, 16);
+                         } catch (boost::system::error_code err) {
+                           std::cout << "STOUL error" << std::endl;
+                         };
 
-                   // header_parsing done here we will add the extra required
-                   // modules here accordingly
-                   while (std::getline(iss, request_line)) {
-                     std::cout << request_line << std::endl;
-                     auto e_pos = request_line.find(":");
+                         if (chunk_length == 0) {
+                           boost::asio::async_read(
+                               this->conn->conn_socket, req->request_buffer,
+                               boost::asio::transfer_exactly(2),
+                               [this,
+                                next](const boost::system::error_code &err,
+                                      size_t bytes_transferred) {
+                                 if (!err) {
+                                   std::cout << "Done with transfer encoding "
+                                             << std::endl;
+                                   next();
+                                 }
+                               });
+                         }
 
-                     if (e_pos == -1)
-                       break;
+                         else {
 
-                     req->request_parsed[request_line.substr(0, e_pos)] =
-                         request_line.substr(e_pos + 2, request_line.length() -
-                                                            e_pos - 2 - 1);
-                     if (request_line.substr(0, e_pos) == "Transfer-Encoding" &&
-                         request_line.substr(e_pos + 2, request_line.length() -
-                                                            e_pos - 2 - 1) ==
-                             "chunked") {
-                       this->filter_chain.push_back(FILTERS::TRANSFER_ENCODING);
-                       req->keepALive = true;
-                     }
-                     if (request_line.substr(0, e_pos) == "Content-Type" &&
-                         request_line.substr(e_pos + 2, request_line.length() -
-                                                            e_pos - 2 - 1) ==
-                             "text/event-stream") {
-                       this->filter_chain.push_back(FILTERS::SSE);
-                       req->keepALive = true;
-                     }
-                   }
+                           if (req->request_buffer.size() >= chunk_length) {
 
-                   std::cout << "remaining possible body buffer:"
-                             << conn->reader.size() << std::endl;
+                             auto bufs = req->request_buffer.data();
+                             std::string data(boost::asio::buffers_begin(bufs),
+                                              boost::asio::buffers_begin(bufs) +
+                                                  chunk_length);
+                             req->request_buffer.consume(chunk_length + 2);
+                             req->transfer_encoded_string += data;
+                             read_transfer_encoding();
+                           } else {
+                             boost::asio::async_read(
+                                 this->conn->conn_socket, req->request_buffer,
+                                 boost::asio::transfer_exactly(
+                                     req->request_buffer.size() - chunk_length +
+                                     2),
+                                 [this, req, read_transfer_encoding](
+                                     const boost::system::error_code &ec,
+                                     std::size_t bytes_transferred) {
+                                   if (!ec) {
+                                     std::istream iss3(&req->request_buffer);
+                                     std::string line3;
+                                     std::getline(iss3, line3);
+                                     line3.pop_back();
+                                     req->transfer_encoded_string += line3;
+                                     read_transfer_encoding();
+                                   } else {
+                                     std::cout << ec.message() << std::endl;
+                                   }
+                                 });
+                           }
+                         }
 
-                 } else {
-                   std::cout << "Error at parsing:" << error.message()
-                             << std::endl;
-                 }
-               });
-         }},
+                       } else {
+                         std::cout << "Error in transfer encoding read "
+                                   << ec.message() << std::endl;
+                       }
+                     });
+               };
+               read_transfer_encoding();
+             }
 
-        {FILTERS::TRANSFER_ENCODING,
-         [this](std::shared_ptr<Request> req) {
-           boost::asio::async_read_until(
-               this->conn->conn_socket, req->request_buffer, "\r\n",
-               [this](const boost::system::error_code &ec, size_t bytes_size) {
-                 if (!ec) {
-                   
-                 } else {
-                   std::cout << "Error in transfer encoding read "
-                             << ec.message() << std::endl;
-                 }
-               });
-         }
-
-        }
+            }
 
     };
     std::vector<FILTERS> filter_chain;
@@ -252,10 +326,10 @@ protected:
     void register_filter(FILTERS reg_filter) {
       filter_chain.push_back(reg_filter);
     }; // register a filter to be applied
-    void apply_filters() {
-      for (auto i : filter_chain) {
-        filters[i](Incoming_unprocessed_request);
-      }
+    void apply_filters(int index = 0) {
+      FILTERS current_filter = filter_chain[index];
+      filters[current_filter](this->Incoming_unprocessed_request,
+                              [index, this]() { apply_filters(index + 1); });
     }; // apply the filters
   };
 
@@ -264,18 +338,17 @@ protected:
     enum class PHASE { SUBREQUEST };
     Generator(std::shared_ptr<Connection> connection) : conn(connection) {};
     std::shared_ptr<Connection> conn;
-    std::shared_ptr<Response> Outgoing_unprocessed_response;
-    std::map<PHASE, std::function<std::shared_ptr<Response>(
-                        std::shared_ptr<Response>)>>
+    std::shared_ptr<Response> Outgoing_unprocessed_response = conn->res;
+    std::map<PHASE, std::function<void(std::shared_ptr<Response>,
+                                       std::function<void()>)>>
         phase_handlers;
     std::vector<PHASE> phase_link;
     void generate_unprocessed_default_response();
     void register_phase_handler(PHASE phase) { phase_link.push_back(phase); }
-    void apply_phase_handlers() {
-      for (auto j : phase_link) {
-        Outgoing_unprocessed_response =
-            phase_handlers[j](Outgoing_unprocessed_response);
-      }
+    void apply_phase_handlers(int index = 0) {
+      auto cp = phase_link[index];
+      phase_handlers[cp](Outgoing_unprocessed_response,
+                         [this, index]() { apply_phase_handlers(index + 1); });
     };
     void write_to_client() {
       Outgoing_unprocessed_response
@@ -306,29 +379,6 @@ protected:
       }
     });
   };
-  void read(const std::shared_ptr<Connection> &conn) {
-    boost::asio::async_read_until(
-        conn->conn_socket, conn->reader, "\r\n\r\n",
-        [this, conn](const boost::system::error_code &error,
-                     std::size_t bytes_transferred) {
-          if (!error) {
-
-            std::string line(bytes_transferred, '\0');
-            std::istream is(&conn->reader);
-            is.read(line.data(), bytes_transferred);
-            conn->reader.consume(bytes_transferred);
-            std::cout << "--" << bytes_transferred << "--"
-                      << conn->reader.size() << std::endl;
-            std::cout << "----\n";
-            std::cout << line << std::endl;
-            std::cout << "----\n";
-            if (!line.empty())
-              request_parser(line, conn);
-          } else {
-            std::cout << "Error at read:" << error.message() << std::endl;
-          }
-        });
-  };
 
   void API_HANDLER(const std::shared_ptr<Connection> &conn) {
     boost::asio::post(this->io_context, [this, conn] {
@@ -340,189 +390,21 @@ protected:
         else
           default_callback(conn->req, conn->res);
       }
-      if (!conn->req->keepALive) {
-
-        conn->conn_socket.async_shutdown(
-            [this, conn](const boost::system::error_code &ec) {
-              if (!ec) {
-                conn->conn_socket.lowest_layer().close();
-              } else {
-                std::cout << ec.message() << std::endl;
-              }
-            });
-        connections_list.erase(std::remove_if(
-            connections_list.begin(), connections_list.end(),
-            [conn](const auto &n_conn) { return conn == n_conn; }));
-      }
+      // if (!conn->req->keepALive) {
+      //
+      //   conn->conn_socket.async_shutdown(
+      //       [this, conn](const boost::system::error_code &ec) {
+      //         if (!ec) {
+      //           conn->conn_socket.lowest_layer().close();
+      //         } else {
+      //           std::cout << ec.message() << std::endl;
+      //         }
+      //       });
+      //   connections_list.erase(std::remove_if(
+      //       connections_list.begin(), connections_list.end(),
+      //       [conn](const auto &n_conn) { return conn == n_conn; }));
+      // }
     });
-  }
-
-  void request_parser(std::string request_content,
-                      const std::shared_ptr<Connection> &conn) {
-    // request_parser for query string , content-length ,version
-    std::istringstream iss(request_content);
-    std::string request_line;
-    std::getline(iss, request_line); // first line: GET /index?x=1 HTTP/1.1
-
-    std::string full_path;
-    std::istringstream rl(request_line);
-    rl >> conn->req->method >> full_path >> conn->req->version;
-    // Extract path and query
-    auto qpos = full_path.find("?");
-    conn->req->path =
-        (qpos != std::string::npos) ? full_path.substr(0, qpos) : full_path;
-
-    if (qpos != std::string::npos) {
-      size_t aepos = full_path.find("=", qpos);
-      if (aepos != std::string::npos) {
-        std::string line;
-        auto cur = qpos + 1;
-        while (aepos != std::string::npos) {
-          auto apos = full_path.find("&", aepos);
-          if (apos == std::string::npos)
-            apos = full_path.length();
-          auto k1 = full_path.substr(cur, aepos - cur);
-          auto v1 = full_path.substr(aepos + 1, apos - aepos - 1);
-          cur = apos + 1;
-          aepos = full_path.find("=", cur);
-
-          ParsedResourceMap[k1] = v1;
-        }
-      }
-    }
-
-    bool te_flag = 0;
-    bool sse_flag = 0;
-
-    // header_parsing
-    while (std::getline(iss, request_line)) {
-      std::cout << request_line << std::endl;
-      auto e_pos = request_line.find(":");
-
-      if (e_pos == -1)
-        break;
-
-      ParsedResourceMap[request_line.substr(0, e_pos)] =
-          request_line.substr(e_pos + 2, request_line.length() - e_pos - 2 - 1);
-      if (request_line.substr(0, e_pos) == "Transfer-Encoding" &&
-          request_line.substr(e_pos + 2, request_line.length() - e_pos - 2 -
-                                             1) == "chunked") {
-        te_flag = 1;
-        keepALive = 1;
-      }
-      if (request_line.substr(0, e_pos) == "Content-Type" &&
-          request_line.substr(e_pos + 2, request_line.length() - e_pos - 2 -
-                                             1) == "text/event-stream") {
-        sse_flag = 1;
-        keepALive = 1;
-      }
-    }
-
-    std::cout << "remaining possible body buffer:" << conn->reader.size()
-              << std::endl;
-
-    if (te_flag) {
-      if (conn->reader.size()) {
-        std::istream ss(&conn->reader);
-        std::string line;
-        int bytes_to_read = 0;
-        while (conn->reader.size() > 0) {
-
-          std::getline(ss, line);
-
-          if (!line.empty() && line.back() == '\r') {
-            line.pop_back();
-          }
-          try {
-            bytes_to_read = std::stoul(line, nullptr, 16);
-          } catch (std::exception &err) {
-            std::cout << "expecetion stdoul" << std::endl;
-          }
-
-          std::size_t buffered_bytes = conn->reader.size() - ss.tellg();
-
-          if (buffered_bytes >= bytes_to_read + 2) {
-            std::vector<char> chunk(bytes_to_read);
-            ss.read(chunk.data(), bytes_to_read);
-            conn->req->body.append(chunk.data(), bytes_to_read);
-
-            ss.ignore(2);
-            conn->reader.consume(ss.tellg());
-          } else {
-            boost::asio::streambuf temp;
-            boost::asio::async_read(
-                conn->conn_socket, temp,
-                boost::asio::transfer_exactly(bytes_to_read - buffered_bytes),
-                [&temp, conn, &ss,
-                 bytes_to_read](const boost::system::error_code &ec,
-                                size_t bytes_transferred) {
-                  if (!ec) {
-                    std::ostream os(&conn->reader);
-                    os << &temp;
-                    std::vector<char> chunk(bytes_to_read);
-                    ss.read(chunk.data(), bytes_to_read);
-                    conn->req->body.append(chunk.data(), bytes_to_read);
-
-                    ss.ignore(2);
-                    conn->reader.consume(ss.tellg());
-                  }
-                });
-          }
-        }
-      }
-      read_chunked_transfer(conn, conn->req);
-    }
-  }
-
-  void read_chunked_transfer(const std::shared_ptr<Connection> &conn,
-                             const std::shared_ptr<Request> &req) {
-    boost::asio::async_read_until(
-        conn->conn_socket, conn->reader, "\r\n",
-        [conn, this, req](const boost::system::error_code &ec,
-                          size_t bytes_transferred) {
-          if (!ec) {
-            std::istream ss(&conn->reader);
-            std::string line;
-            std::getline(ss, line);
-            std::cout << line << "---" << bytes_transferred << std::endl;
-            if (!line.empty() && line.back() == '\r')
-              line.pop_back();
-            const size_t chunk_size = std::stoull(line, 0, 16);
-
-            if (chunk_size == 0) {
-              // stopping condition
-              std::cout << "Received the last chunk" << std::endl;
-              boost::asio::streambuf buff;
-              boost::asio::async_read(
-                  conn->conn_socket, buff, boost::asio::transfer_all(),
-                  [this, conn](const boost::system::error_code &ec,
-                               size_t bytes_transferred) {
-                    if (!ec) {
-                      std::cout << " final line removed " << std::endl;
-                    }
-                  });
-            } else {
-              boost::asio::async_read(
-                  conn->conn_socket, conn->reader,
-                  boost::asio::transfer_exactly(chunk_size + 2),
-                  [req, this, conn](const boost::system::error_code &ec,
-                                    std::size_t bytes_transferred) mutable {
-                    if (!ec) {
-                      std::istream bs(&conn->reader);
-                      std::string line_c;
-                      std::getline(bs, line_c);
-
-                      std::cout << "line _rec:" << line_c << std::endl;
-                      req->body += line_c.substr(0, line_c.size() - 2);
-
-                      bs.ignore(2);
-                      this->read_chunked_transfer(conn, req);
-                    }
-                  });
-            }
-          } else {
-          }
-        });
   }
 
   bool requesthandlercallback(std::string &regex, std::string &method,
@@ -555,7 +437,7 @@ protected:
           if (!error) {
             this->log_info_tls(conn->conn_socket);
             this->connections_list.push_back(conn);
-            this->read(conn);
+            this->processor_generator_handler(conn);
           } else {
             std::cout << "TLS_handshake failed .." + error.message()
                       << std::endl;
@@ -563,7 +445,7 @@ protected:
         });
   }
 
-  void processor_generator_handler(std::shared_ptr<Connection> &conn) {
+  void processor_generator_handler(const std::shared_ptr<Connection> &conn) {
     auto processor = std::make_shared<Processor>(conn);
     auto generator = std::make_shared<Generator>(conn);
 
