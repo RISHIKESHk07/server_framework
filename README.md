@@ -1,0 +1,16 @@
+# PLAN
+- Plan of action is that we first write the structur of functions we want to write without implementation and required TTD on my own and then fill up one by one , but write TTD first , it helps making sure that we know exactly what we want to know and what it needs to solves .
+- Write a simple client lib in cpp and port to js .
+- HTTP 1.1
+- Websocket
+- transfer encoding 
+- file transfer 
+- static hosting 
+- connection pooling and custom allocater 
+- Cache implementation from nginx 
+- Stress Testing 
+- Webrtc
+- HTTP 2
+- Custom messaging protocol
+- Video streaming using http2 or better algos using DL for ADP
+- BitTorrent support & P2P for gaming system (mainly UDP) .

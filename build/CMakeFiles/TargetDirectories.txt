@@ -1,0 +1,3 @@
+/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/tls_server.dir
+/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/edit_cache.dir
+/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/rebuild_cache.dir

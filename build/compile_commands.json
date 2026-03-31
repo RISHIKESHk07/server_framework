@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/Users/ravi/Desktop/server_framework/simple_wss/build",
+  "command": "/usr/bin/c++   -std=gnu++17 -o CMakeFiles/tls_server.dir/server.cpp.o -c /Users/ravi/Desktop/server_framework/simple_wss/server.cpp",
+  "file": "/Users/ravi/Desktop/server_framework/simple_wss/server.cpp",
+  "output": "CMakeFiles/tls_server.dir/server.cpp.o"
+}
+]

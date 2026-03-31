@@ -1,0 +1,8 @@
+CompileFlags:
+  Add: [
+    "-I/usr/local/include",
+    "-L/usr/local/lib",
+    # If find_package found a specific version, add that exact path:
+    "-I/usr/local/Cellar/boost/1.90.0_1/include" 
+  ]
+
