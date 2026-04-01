@@ -1,3 +1,4 @@
+#include "boost/asio/completion_condition.hpp"
 #include "boost/asio/connect.hpp"
 #include "boost/asio/io_context.hpp"
 #include "boost/asio/ssl/context.hpp"
@@ -25,18 +26,32 @@ int main() {
               [&socket](const boost::system::error_code &ec) {
                 if (!ec) {
                   std::cout << "handshake ... complete" << std::endl;
-                  std::string HTTP_GETrequest = ```GET /test 1.1```;
+                  std::string HTTP_GETrequest = "GET /test HTTP/1.1\r\n"
+                                                "Host: example.com\r\n"
+                                                "User-Agent: C++Client/1.0\r\n"
+                                                "Accept: application/json\r\n"
+                                                "Connection: close\r\n"
+                                                "\r\n\r\n";
                   boost::asio::streambuf writeBuf;
+                  boost::asio::streambuf reader;
                   std::ostream iss(&writeBuf);
                   iss << HTTP_GETrequest;
                   boost::asio::async_write(
-                      socket.lowest_layer(), writeBuf,
-                      [](const boost::system::error_code &ec,
+                      socket, writeBuf,
+                      [&socket , &reader ,&writeBuf](const boost::system::error_code &ec,
                          std::size_t bytes) {
-                            if(!ec){
-                             std::cout << "written succesfully" <<std::endl;
-                             // start a read for the output .... 
-                            }
+                        if (!ec) {
+                          std::cout << "written succesfully" << std::endl;
+                          
+                          // boost::asio::async_read(socket,reader,boost::asio::transfer_at_least(1),[&reader,&writeBuf](const boost::system::error_code& err , size_t bytes){
+                          //      if(!err){
+                          //         auto bufs = reader.data();
+                          //         const char* data = static_cast<const char*>(bufs.data());
+                          //         std::string rs(data,bufs.size());
+                          //         std::cout << rs << std::endl; 
+                          //      }
+                          //     });
+                        }
                       });
                 } else
                   std::cout << ec.message() << std::endl;

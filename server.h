@@ -134,10 +134,10 @@ protected:
       SSE
     };
     std::shared_ptr<Connection> conn;
-    Processor(std::shared_ptr<Connection> conn) : conn(conn) {
-      Incoming_unprocessed_request = conn->req;
-    };
     std::shared_ptr<Request> Incoming_unprocessed_request;
+    Processor(std::shared_ptr<Connection> conn) : conn(conn) , Incoming_unprocessed_request(conn->req) {
+    };
+    
     std::map<FILTERS, std::function<void(std::shared_ptr<Request>,
                                          std::function<void()>)>>
         filters = {
@@ -150,11 +150,6 @@ protected:
                                      std::size_t bytes_transferred) {
                      if (!error) {
 
-                       std::string line(bytes_transferred, '\0');
-                       std::istream is(&req->request_buffer);
-                       is.read(line.data(), bytes_transferred);
-                       req->request_buffer.consume(bytes_transferred);
-
                        std::istream iss(&req->request_buffer);
                        std::string request_line;
                        std::getline(
@@ -163,11 +158,11 @@ protected:
 
                        std::string full_path;
                        std::istringstream rl(request_line);
-                       rl >> conn->req->method >> full_path >>
-                           conn->req->version;
+                       rl >> req->method >> full_path >>
+                          req->version;
                        // Extract path and query
                        auto qpos = full_path.find("?");
-                       conn->req->path = (qpos != std::string::npos)
+                       req->path = (qpos != std::string::npos)
                                              ? full_path.substr(0, qpos)
                                              : full_path;
 
@@ -226,7 +221,7 @@ protected:
                        }
 
                        std::cout << "remaining possible body buffer:"
-                                 << conn->reader.size() << std::endl;
+                                 << req->request_buffer.size() << std::endl;
                        next();
                      } else {
                        std::cout << "Error at parsing:" << error.message()
@@ -327,8 +322,10 @@ protected:
       filter_chain.push_back(reg_filter);
     }; // register a filter to be applied
     void apply_filters(int index = 0) {
+      if(filter_chain.size() == 0) return;
+      if( index > filter_chain.size()) return;
       FILTERS current_filter = filter_chain[index];
-      filters[current_filter](this->Incoming_unprocessed_request,
+      filters[current_filter](this->conn->req,
                               [index, this]() { apply_filters(index + 1); });
     }; // apply the filters
   };
@@ -346,6 +343,8 @@ protected:
     void generate_unprocessed_default_response();
     void register_phase_handler(PHASE phase) { phase_link.push_back(phase); }
     void apply_phase_handlers(int index = 0) {
+      if(phase_link.size() == 0) return;
+      if(index>phase_link.size()) return;
       auto cp = phase_link[index];
       phase_handlers[cp](Outgoing_unprocessed_response,
                          [this, index]() { apply_phase_handlers(index + 1); });
