@@ -1,4 +1,3 @@
-#include "boost/asio/completion_condition.hpp"
 #include "boost/asio/connect.hpp"
 #include "boost/asio/io_context.hpp"
 #include "boost/asio/ssl/context.hpp"
@@ -7,7 +6,8 @@
 #include "boost/asio/streambuf.hpp"
 #include <boost/asio.hpp>
 #include <iostream>
-int main() {
+#include <string_view>
+int main(int argc, char *argv[]) {
   boost::asio::io_context io_context;
   boost::asio::ssl::context cl(boost::asio::ssl::context::tlsv12_client);
   cl.set_verify_mode(boost::asio::ssl::verify_none);
@@ -19,40 +19,97 @@ int main() {
 
   boost::asio::async_connect(
       socket.lowest_layer(), endpoint,
-      [&socket](const boost::system::error_code &err, const auto &endpoints) {
+      [&socket, argv](const boost::system::error_code &err,
+                      const auto &endpoints) {
         if (!err) {
           socket.async_handshake(
               boost::asio::ssl::stream_base::client,
-              [&socket](const boost::system::error_code &ec) {
+              [&socket, argv](const boost::system::error_code &ec) {
                 if (!ec) {
                   std::cout << "handshake ... complete" << std::endl;
-                  std::string HTTP_GETrequest = "GET /test HTTP/1.1\r\n"
-                                                "Host: example.com\r\n"
-                                                "User-Agent: C++Client/1.0\r\n"
-                                                "Accept: application/json\r\n"
-                                                "Connection: close\r\n"
-                                                "\r\n\r\n";
-                  boost::asio::streambuf writeBuf;
-                  boost::asio::streambuf reader;
-                  std::ostream iss(&writeBuf);
-                  iss << HTTP_GETrequest;
-                  boost::asio::async_write(
-                      socket, writeBuf,
-                      [&socket , &reader ,&writeBuf](const boost::system::error_code &ec,
-                         std::size_t bytes) {
-                        if (!ec) {
-                          std::cout << "written succesfully" << std::endl;
-                          
-                          // boost::asio::async_read(socket,reader,boost::asio::transfer_at_least(1),[&reader,&writeBuf](const boost::system::error_code& err , size_t bytes){
-                          //      if(!err){
-                          //         auto bufs = reader.data();
-                          //         const char* data = static_cast<const char*>(bufs.data());
-                          //         std::string rs(data,bufs.size());
-                          //         std::cout << rs << std::endl; 
-                          //      }
-                          //     });
-                        }
-                      });
+                  std::string_view cmd = argv[1];
+
+                  if (cmd == "g") {
+                    std::string http_getrequest =
+                        "GET /test http/1.1\r\n"
+                        "host: example.com\r\n"
+                        "user-agent: c++client/1.0\r\n"
+                        "accept: application/json\r\n"
+                        "connection: close\r\n"
+                        "\r\n\r\n";
+                    boost::asio::streambuf writebuf;
+                    boost::asio::streambuf reader;
+                    std::ostream iss(&writebuf);
+                    iss << http_getrequest;
+                    boost::asio::async_write(
+                        socket, writebuf,
+                        [&socket, &reader,
+                         &writebuf](const boost::system::error_code &ec,
+                                    std::size_t bytes) {
+                          if (!ec) {
+                            std::cout << "written succesfully" << std::endl;
+
+                            // boost::asio::async_read(
+                            //     socket, reader,
+                            //     boost::asio::transfer_at_least(1),
+                            //     [&reader, &writebuf](
+                            //         const boost::system::error_code &err,
+                            //         size_t bytes) {
+                            //       if (!err) {
+                            //         auto bufs = reader.data();
+                            //         const char *data =
+                            //             static_cast<const char
+                            //             *>(bufs.data());
+                            //         std::string rs(data, bufs.size());
+                            //         std::cout << rs << std::endl;
+                            //       }
+                            //     });
+                          }
+                        });
+                  } else if (cmd == "te") {
+                    std::string http_te_request =
+                        "POST /test HTTP/1.1\r\n"
+                        "Host: example.com\r\n"
+                        "Transfer-Encoding: chunked\r\n"
+                        "Content-Type: text/plain\r\n"
+                        "Connection: close\r\n"
+                        "\r\n\r\n"
+                        "5\r\n" // Hex size of "Hello"
+                        "Hello\r\n"
+                        "6\r\n" // Hex size of " World"
+                        " World\r\n"
+                        "0\r\n" // End of message
+                        "\r\n\r\n";
+                    auto writebuf = std::make_shared<boost::asio::streambuf>();
+                    auto reader = std::make_shared<boost::asio::streambuf>();
+                    std::ostream iss(writebuf.get());
+                    iss << http_te_request;
+                    boost::asio::async_write(
+                        socket, *writebuf,
+                        [&socket, reader,
+                         writebuf](const boost::system::error_code &ec,
+                                    std::size_t bytes) {
+                          if (!ec) {
+                            std::cout << "TE written succesfully" << std::endl;
+
+                            // boost::asio::async_read(
+                            //     socket, reader,
+                            //     boost::asio::transfer_at_least(1),
+                            //     [&reader, &writebuf](
+                            //         const boost::system::error_code &err,
+                            //         size_t bytes) {
+                            //       if (!err) {
+                            //         auto bufs = reader.data();
+                            //         const char *data =
+                            //             static_cast<const char
+                            //             *>(bufs.data());
+                            //         std::string rs(data, bufs.size());
+                            //         std::cout << rs << std::endl;
+                            //       }
+                            //     });
+                          }
+                        });
+                  }
                 } else
                   std::cout << ec.message() << std::endl;
               });

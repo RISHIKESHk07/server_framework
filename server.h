@@ -1,4 +1,5 @@
 #include "boost/asio/buffers_iterator.hpp"
+#include "boost/asio/post.hpp"
 #include <boost/asio.hpp>
 #include <boost/asio/completion_condition.hpp>
 #include <boost/asio/detail/std_fenced_block.hpp>
@@ -9,9 +10,9 @@
 #include <boost/asio/streambuf.hpp>
 #include <boost/system/error_code.hpp>
 #include <cstddef>
+#include <deque>
 #include <iostream>
 #include <istream>
-#include <iterator>
 #include <map>
 #include <memory>
 #include <ostream>
@@ -123,7 +124,7 @@ protected:
       std::cout << err.message() << std::endl;
     }
   }
-  class Processor {
+  class Processor : public std::enable_shared_from_this<Processor> {
   public:
     enum class FILTERS {
       PARSE_HEADER,
@@ -135,9 +136,9 @@ protected:
     };
     std::shared_ptr<Connection> conn;
     std::shared_ptr<Request> Incoming_unprocessed_request;
-    Processor(std::shared_ptr<Connection> conn) : conn(conn) , Incoming_unprocessed_request(conn->req) {
-    };
-    
+    Processor(std::shared_ptr<Connection> conn)
+        : conn(conn), Incoming_unprocessed_request(conn->req) {};
+
     std::map<FILTERS, std::function<void(std::shared_ptr<Request>,
                                          std::function<void()>)>>
         filters = {
@@ -158,13 +159,12 @@ protected:
 
                        std::string full_path;
                        std::istringstream rl(request_line);
-                       rl >> req->method >> full_path >>
-                          req->version;
+                       rl >> req->method >> full_path >> req->version;
                        // Extract path and query
                        auto qpos = full_path.find("?");
                        req->path = (qpos != std::string::npos)
-                                             ? full_path.substr(0, qpos)
-                                             : full_path;
+                                       ? full_path.substr(0, qpos)
+                                       : full_path;
 
                        if (qpos != std::string::npos) {
                          size_t aepos = full_path.find("=", qpos);
@@ -219,7 +219,7 @@ protected:
                            req->keepALive = true;
                          }
                        }
-
+                       req->request_buffer.consume(2);
                        std::cout << "remaining possible body buffer:"
                                  << req->request_buffer.size() << std::endl;
                        next();
@@ -232,8 +232,8 @@ protected:
 
             {FILTERS::TRANSFER_ENCODING,
              [this](std::shared_ptr<Request> req, auto next) {
-               std::function<void()> read_transfer_encoding;
-               read_transfer_encoding = [this, req, read_transfer_encoding,
+               auto read_transfer_encoding = std::make_shared<std::function<void()>>();
+               *(read_transfer_encoding) = [this, req, read_transfer_encoding,
                                          next]() {
                  boost::asio::async_read_until(
                      this->conn->conn_socket, req->request_buffer, "\r\n",
@@ -244,6 +244,9 @@ protected:
                          std::istream iss(&req->request_buffer);
                          std::string line;
                          std::getline(iss, line);
+                         std::cout << req->request_buffer.size() << std::endl;
+                         std::cout << line << "<----" << line.size()
+                                   << std::endl;
                          int chunk_length;
                          if (line.back() == '\r')
                            line.pop_back();
@@ -252,15 +255,19 @@ protected:
                          } catch (boost::system::error_code err) {
                            std::cout << "STOUL error" << std::endl;
                          };
-
+                         std::cout << "chunk_length:" << chunk_length
+                                   << "buffer_size_current:"
+                                   << req->request_buffer.size() << std::endl;
                          if (chunk_length == 0) {
-                           boost::asio::async_read(
+                           std::cout << "inside zero chunk" << std::endl;
+                           boost::asio::async_read_until(
                                this->conn->conn_socket, req->request_buffer,
-                               boost::asio::transfer_exactly(2),
+                               "\r\n\r\n",
                                [this,
                                 next](const boost::system::error_code &err,
                                       size_t bytes_transferred) {
                                  if (!err) {
+                                  std::cout << this->conn->req->transfer_encoded_string << std::endl;
                                    std::cout << "Done with transfer encoding "
                                              << std::endl;
                                    next();
@@ -278,7 +285,17 @@ protected:
                                                   chunk_length);
                              req->request_buffer.consume(chunk_length + 2);
                              req->transfer_encoded_string += data;
-                             read_transfer_encoding();
+                             boost::asio::post(
+                                 this->conn->conn_socket.get_executor(),
+                                 [read_transfer_encoding]() {
+                                   (*read_transfer_encoding)();
+                                 }); // here we need post wrapping because we
+                                     // want the make sure this line is applied
+                                     // after we are done with current work on
+                                     // the loop , if not not used then this can
+                                     // interfere by increasing the stack of
+                                     // this section , while some other async
+                                     // code is working
                            } else {
                              boost::asio::async_read(
                                  this->conn->conn_socket, req->request_buffer,
@@ -294,7 +311,11 @@ protected:
                                      std::getline(iss3, line3);
                                      line3.pop_back();
                                      req->transfer_encoded_string += line3;
-                                     read_transfer_encoding();
+                                     boost::asio::post(
+                                         this->conn->conn_socket.get_executor(),
+                                         [read_transfer_encoding]() {
+                                           (*read_transfer_encoding)();
+                                         });
                                    } else {
                                      std::cout << ec.message() << std::endl;
                                    }
@@ -308,12 +329,14 @@ protected:
                        }
                      });
                };
-               read_transfer_encoding();
+               boost::asio::post(
+                   this->conn->conn_socket.get_executor(),
+                   [read_transfer_encoding]() { std::cout << "starting" << std::endl; (*read_transfer_encoding)(); });
              }
 
             }
 
-    };
+        };
     std::vector<FILTERS> filter_chain;
     void process_request() {
       return;
@@ -322,20 +345,32 @@ protected:
       filter_chain.push_back(reg_filter);
     }; // register a filter to be applied
     void apply_filters(int index = 0) {
-      if(filter_chain.size() == 0) return;
-      if( index > filter_chain.size()) return;
+      auto self = shared_from_this();
+      if (filter_chain.size() == 0)
+        return;
+      if (index >= filter_chain.size()){
+        std::cout << "escaping" << std::endl;
+        return;
+
+      }
       FILTERS current_filter = filter_chain[index];
-      filters[current_filter](this->conn->req,
-                              [index, this]() { apply_filters(index + 1); });
+
+      std::cout << filter_chain.size() << " Chain size--index:" << index
+                << std::endl;
+      for (auto i : filter_chain) {
+        std::cout << int(i) << std::endl;
+      }
+
+      filters[current_filter](
+          self->conn->req, [index, self]() { self->apply_filters(index + 1); });
     }; // apply the filters
   };
 
-  class Generator {
+  class Generator : public std::enable_shared_from_this<Generator>{
   public:
     enum class PHASE { SUBREQUEST };
     Generator(std::shared_ptr<Connection> connection) : conn(connection) {};
     std::shared_ptr<Connection> conn;
-    std::shared_ptr<Response> Outgoing_unprocessed_response = conn->res;
     std::map<PHASE, std::function<void(std::shared_ptr<Response>,
                                        std::function<void()>)>>
         phase_handlers;
@@ -343,15 +378,17 @@ protected:
     void generate_unprocessed_default_response();
     void register_phase_handler(PHASE phase) { phase_link.push_back(phase); }
     void apply_phase_handlers(int index = 0) {
-      if(phase_link.size() == 0) return;
-      if(index>phase_link.size()) return;
+      auto self = shared_from_this();
+      if (phase_link.size() == 0)
+        return;
+      if (index > phase_link.size())
+        return;
       auto cp = phase_link[index];
-      phase_handlers[cp](Outgoing_unprocessed_response,
-                         [this, index]() { apply_phase_handlers(index + 1); });
+      phase_handlers[cp](self->conn->res,
+                         [this, index , self]() { self->apply_phase_handlers(index + 1); });
     };
     void write_to_client() {
-      Outgoing_unprocessed_response
-          ->send(); // rewrite this this to be more than default value , use
+      this->conn->res->send(); // rewrite this this to be more than default value , use
                     // Response class itself
     };
   };
@@ -444,6 +481,20 @@ protected:
         });
   }
 
+  using Task = std::function<void(std::function<void()>)>;
+  
+  void run_chain(std::deque<Task> sequence){
+
+      auto current_task = std::move(sequence.front());
+      sequence.pop_front();
+      
+      current_task([tasks = std::move(sequence), this ]() mutable{
+                  run_chain(tasks);
+      });
+
+  }
+
+
   void processor_generator_handler(const std::shared_ptr<Connection> &conn) {
     auto processor = std::make_shared<Processor>(conn);
     auto generator = std::make_shared<Generator>(conn);
@@ -451,8 +502,9 @@ protected:
     processor->register_filter(Processor::FILTERS::PARSE_HEADER);
     processor->apply_filters();
 
+    std::cout << "API_H" << std::endl; 
     API_HANDLER(conn);
-
+    std::cout << "Gen:" << std::endl;
     generator->apply_phase_handlers();
     generator->write_to_client();
   }
