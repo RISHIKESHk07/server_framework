@@ -12,7 +12,8 @@ int main() {
                      [](const std::shared_ptr<Request> &req,
                         const std::shared_ptr<Response> &res) {
                        std::cout << "POST /test endpoint invovked" << std::endl;
-                       res->send();
+                       std::cout << req->transfer_encoded_string << std::endl;
+                       res->map_body["db_response"] = "Mongodb sucks enough ... Syclla for the win";
                      });
 
   s.register_handler("/test_chunked", "POST",

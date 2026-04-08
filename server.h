@@ -1,5 +1,8 @@
 #include "boost/asio/buffers_iterator.hpp"
 #include "boost/asio/post.hpp"
+#include "boost/asio/registered_buffer.hpp"
+#include "boost/asio/write.hpp"
+#include "boost/system/detail/error_code.hpp"
 #include <boost/asio.hpp>
 #include <boost/asio/completion_condition.hpp>
 #include <boost/asio/detail/std_fenced_block.hpp>
@@ -11,8 +14,11 @@
 #include <boost/system/error_code.hpp>
 #include <cstddef>
 #include <deque>
+#include <fstream>
+#include <ios>
 #include <iostream>
 #include <istream>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <ostream>
@@ -21,7 +27,9 @@
 #include <vector>
 
 class Connection;
+
 class Request {
+
 public:
   boost::asio::streambuf request_buffer;
   std::string version;
@@ -30,14 +38,27 @@ public:
   std::string path;
   std::string transfer_encoded_string;
   std::map<std::string, std::string> request_parsed;
+
   bool keepALive = false;
 };
 
 class Response {
 public:
+  enum class RESPONSE_CODES { HTTP_200, HTTP_404, HTTP_500 };
+  std::map<RESPONSE_CODES, std::string> RESPONSE_MESSAGE_MAP = {
+      {RESPONSE_CODES::HTTP_200, "Ok"},
+      {RESPONSE_CODES::HTTP_404, "Not Found"},
+      {RESPONSE_CODES::HTTP_500, "Server Failed"}};
+  std::map<RESPONSE_CODES, std::string> RESPONSE_CODE_MAP = {
+      {RESPONSE_CODES::HTTP_200, "200"},
+      {RESPONSE_CODES::HTTP_404, "404"},
+      {RESPONSE_CODES::HTTP_500, "500"}};
   Connection *parent_conn = nullptr;
   boost::asio::streambuf response_buffer;
   std::string version;
+  std::string body;
+  std::map<std::string, std::string> map_body;
+  RESPONSE_CODES res_code;
   void send();
   void write_response(); // write the response status,body ..etc
 };
@@ -124,6 +145,8 @@ protected:
       std::cout << err.message() << std::endl;
     }
   }
+  enum class MIME { HTML, CSS, JS };
+
   class Processor : public std::enable_shared_from_this<Processor> {
   public:
     enum class FILTERS {
@@ -131,6 +154,7 @@ protected:
       BODY_PARSER,
       TRANSFER_ENCODING,
       WSS,
+      STATIC_SERVING,
       HTTP2,
       SSE
     };
@@ -184,6 +208,25 @@ protected:
                              req->request_parsed[k1] = v1;
                            }
                          }
+                       } else {
+                         auto temp_path = req->path;
+                         auto spos = temp_path.find(".");
+                         std::vector<MIME> mime_types;
+
+                         if (spos != std::string::npos) {
+                           auto s_word = temp_path.substr(
+                               spos + 1, temp_path.size() - spos);
+                           if (s_word == "html")
+                             mime_types.push_back(MIME::HTML);
+                           else if (s_word == "css")
+                             mime_types.push_back(MIME::CSS);
+                           else if (s_word == "js")
+                             mime_types.push_back(MIME::JS);
+                         }
+                         if (mime_types.size() != 0) {
+                           this->filter_chain.push_back(
+                               FILTERS::STATIC_SERVING);
+                         }
                        }
 
                        bool te_flag = 0;
@@ -219,7 +262,7 @@ protected:
                            req->keepALive = true;
                          }
                        }
-                       req->request_buffer.consume(2);
+
                        std::cout << "remaining possible body buffer:"
                                  << req->request_buffer.size() << std::endl;
                        next();
@@ -232,9 +275,10 @@ protected:
 
             {FILTERS::TRANSFER_ENCODING,
              [this](std::shared_ptr<Request> req, auto next) {
-               auto read_transfer_encoding = std::make_shared<std::function<void()>>();
+               auto read_transfer_encoding =
+                   std::make_shared<std::function<void()>>();
                *(read_transfer_encoding) = [this, req, read_transfer_encoding,
-                                         next]() {
+                                            next]() {
                  boost::asio::async_read_until(
                      this->conn->conn_socket, req->request_buffer, "\r\n",
                      [this, req, read_transfer_encoding,
@@ -262,12 +306,14 @@ protected:
                            std::cout << "inside zero chunk" << std::endl;
                            boost::asio::async_read_until(
                                this->conn->conn_socket, req->request_buffer,
-                               "\r\n\r\n",
+                               "\r\n",
                                [this,
                                 next](const boost::system::error_code &err,
                                       size_t bytes_transferred) {
                                  if (!err) {
-                                  std::cout << this->conn->req->transfer_encoded_string << std::endl;
+                                   std::cout << this->conn->req
+                                                    ->transfer_encoded_string
+                                             << std::endl;
                                    std::cout << "Done with transfer encoding "
                                              << std::endl;
                                    next();
@@ -283,6 +329,7 @@ protected:
                              std::string data(boost::asio::buffers_begin(bufs),
                                               boost::asio::buffers_begin(bufs) +
                                                   chunk_length);
+                             std::cout << "1 case" << std::endl;
                              req->request_buffer.consume(chunk_length + 2);
                              req->transfer_encoded_string += data;
                              boost::asio::post(
@@ -300,17 +347,29 @@ protected:
                              boost::asio::async_read(
                                  this->conn->conn_socket, req->request_buffer,
                                  boost::asio::transfer_exactly(
-                                     req->request_buffer.size() - chunk_length +
-                                     2),
-                                 [this, req, read_transfer_encoding](
+                                     chunk_length + 2 -
+                                     req->request_buffer.size()),
+                                 [this, req, read_transfer_encoding,
+                                  chunk_length](
                                      const boost::system::error_code &ec,
                                      std::size_t bytes_transferred) {
                                    if (!ec) {
-                                     std::istream iss3(&req->request_buffer);
-                                     std::string line3;
-                                     std::getline(iss3, line3);
-                                     line3.pop_back();
-                                     req->transfer_encoded_string += line3;
+                                     std::cout
+                                         << "2 case"
+                                         << std::endl; // in the case we have \n
+                                                       // in middle of our
+                                                       // payload chunk this
+                                                       // logic will break , so
+                                                       // you could rewrite
+                                                       // using constant buffer
+                                     auto bufs = req->request_buffer.data();
+                                     std::string data(
+                                         boost::asio::buffers_begin(bufs),
+                                         boost::asio::buffers_begin(bufs) +
+                                             chunk_length);
+                                     req->transfer_encoded_string += data;
+                                     req->request_buffer.consume(chunk_length +
+                                                                 2);
                                      boost::asio::post(
                                          this->conn->conn_socket.get_executor(),
                                          [read_transfer_encoding]() {
@@ -329,9 +388,33 @@ protected:
                        }
                      });
                };
-               boost::asio::post(
-                   this->conn->conn_socket.get_executor(),
-                   [read_transfer_encoding]() { std::cout << "starting" << std::endl; (*read_transfer_encoding)(); });
+               boost::asio::post(this->conn->conn_socket.get_executor(),
+                                 [read_transfer_encoding]() {
+                                   std::cout << "starting" << std::endl;
+                                   (*read_transfer_encoding)();
+                                 });
+             }
+
+            },
+            {FILTERS::SSE,
+             [this](std::shared_ptr<Request> req, auto next) {
+               std::shared_ptr<std::function<void()>> sse_function;
+               *sse_function = [this, req, next]() {
+                 // empty for now ig if we need to do decoding of gzip and stuff
+                 // we can do it here .... but not required now
+                 next();
+               };
+               boost::asio::post(this->conn->conn_socket.get_executor(),
+                                 [sse_function]() {
+                                   std::cout << "starting" << std::endl;
+                                   (*sse_function)();
+                                 });
+             }},
+            {FILTERS::STATIC_SERVING,
+             [this](std::shared_ptr<Request> req, auto next) {
+               // empty function this is fowarding this painly to generator to
+               // complete process .
+               next();
              }
 
             }
@@ -344,14 +427,16 @@ protected:
     void register_filter(FILTERS reg_filter) {
       filter_chain.push_back(reg_filter);
     }; // register a filter to be applied
-    void apply_filters(int index = 0) {
+    void
+    apply_filters(int index = 0,
+                  std::function<void()> next_in_global_chain_link = nullptr) {
       auto self = shared_from_this();
       if (filter_chain.size() == 0)
         return;
-      if (index >= filter_chain.size()){
+      if (index >= filter_chain.size()) {
         std::cout << "escaping" << std::endl;
+        next_in_global_chain_link();
         return;
-
       }
       FILTERS current_filter = filter_chain[index];
 
@@ -362,34 +447,190 @@ protected:
       }
 
       filters[current_filter](
-          self->conn->req, [index, self]() { self->apply_filters(index + 1); });
+          self->conn->req, [index, self, next_in_global_chain_link]() {
+            self->apply_filters(index + 1, next_in_global_chain_link);
+          });
     }; // apply the filters
   };
 
-  class Generator : public std::enable_shared_from_this<Generator>{
+  class Generator : public std::enable_shared_from_this<Generator> {
   public:
-    enum class PHASE { SUBREQUEST };
+    enum class PHASE {
+      SSE,
+      SUBREQUEST,
+      RESPONSE_WRITE_TO_CLIENT,
+      STATIC_SERVER
+    };
     Generator(std::shared_ptr<Connection> connection) : conn(connection) {};
     std::shared_ptr<Connection> conn;
     std::map<PHASE, std::function<void(std::shared_ptr<Response>,
                                        std::function<void()>)>>
-        phase_handlers;
+        phase_handlers = {
+            {Server::Generator::PHASE::RESPONSE_WRITE_TO_CLIENT,
+             [this](std::shared_ptr<Response> res, auto next) {
+               std::ostream os(&res->response_buffer);
+               os << this->conn->res
+                         ->RESPONSE_CODE_MAP[this->conn->res->res_code]
+                  << " "
+                  << this->conn->res
+                         ->RESPONSE_MESSAGE_MAP[this->conn->res->res_code]
+                  << "HTTP1.1\r\n"
+                  << "Content-Type: text/plain\r\n"
+                  << "Content-Length: 11\r\n"
+                  << "\r\n"
+                  << "Hello World\r\n";
+
+               if (res->body.size() > 0) {
+                 for (auto i : res->map_body) { // TODO :fix this later this is
+                                                // not how we do it ...
+                   os << i.second;
+                 }
+               }
+
+               boost::asio::async_write(
+                   this->conn->conn_socket, res->response_buffer,
+                   [](const boost::system::error_code &ec,
+                      std::size_t bytes_transferred) {
+                     if (!ec) {
+                       std::cout << "Sent a response message .." << std::endl;
+                     }
+                   });
+             }},
+            {Server::Generator::PHASE::STATIC_SERVER,
+             [this](std::shared_ptr<Response>, auto next) {
+               auto temp_req_path = "/assets/" + this->conn->req->path;
+               auto s_pos = temp_req_path.find(".");
+               auto file_name = temp_req_path.substr(0, s_pos - 1);
+               auto mime_type = temp_req_path.substr(
+                   s_pos + 1, temp_req_path.size() - s_pos);
+
+               try {
+                 std::ifstream file(temp_req_path, std::ios::binary);
+                 std::ostringstream ss;
+                 ss << file.rdbuf();
+
+                 std::ostringstream oss;
+
+                 this->conn->res->body = ss.str();
+                 this->conn->res->res_code = Response::RESPONSE_CODES::HTTP_200;
+
+                 oss << "200 OK HTTP/1.1\r\n";
+                 oss << "Content-Type: text/" << mime_type << "\r\n";
+                 oss << "Content-Length: " << ss.str().size() << "\r\n";
+                 oss << "Connection: close\r\n";
+                 oss << "\r\n";
+                 oss << ss.str();
+                 std::ostream os(&this->conn->res->response_buffer);
+                 os << oss.str();
+                 boost::asio::async_write(
+                     this->conn->conn_socket, this->conn->res->response_buffer,
+                     [mime_type](const boost::system::error_code &ec,
+                                 std::size_t bytes) {
+                       if (!ec) {
+                         std::cout << "Sent required Asset" << mime_type
+                                   << std::endl;
+                       }
+                     });
+
+               } catch (const boost::system::error_code &err) {
+                 std::cout << err.message() << std::endl;
+               }
+             }},
+
+            {Server::Generator::PHASE::SSE,
+             [this](std::shared_ptr<Response>, auto next) {
+               std::ostringstream header_oss;
+               this->conn->res->res_code = Response::RESPONSE_CODES::HTTP_200;
+               header_oss << "HTTP/1.1 200 OK\r\n"
+                          << "Content-Type: text/event-stream\r\n"
+                          << "Connection: keep-alive\r\n"
+                          << "Transfer-Encoding: chunked\r\n"
+                          << "\r\n";
+               // Pair: {Event_ID, SSE_Formatted_Data}
+               std::vector<std::pair<std::string, std::string>> sse_messages = {
+                   {"0", "retry: 15000\n\n"},
+                   {"1", "id: 1\ndata: First message is a simple string.\n\n"},
+                   {"2", "id: 2\ndata: {\"message\": \"JSON payload\"}\n\n"},
+                   {"42", "id: 42\nevent: bar\ndata: Multi-line message "
+                          "of\ndata: type \"bar\" and id \"42\"\n\n"},
+                   {"43", "id: 43\ndata: Last message, id \"43\"\n\n"}};
+
+               boost::asio::async_write(
+                   this->conn->conn_socket,
+                   boost::asio::buffer(header_oss.str()),
+                   [](const boost::system::error_code &ec, std::size_t bytes) {
+                     if (!ec) {
+                       std::cout << "SSE chunks sent " << std::endl;
+                     }
+                   });
+
+               auto if_last_event_id_present =
+                   this->conn->req->request_parsed.find("Last-Event-ID");
+               int index_of_last_event_id_if_exists = -1;
+               if (if_last_event_id_present !=
+                   this->conn->req->request_parsed.end()) {
+                 index_of_last_event_id_if_exists =
+                     std::distance(this->conn->req->request_parsed.begin(),
+                                   if_last_event_id_present);
+               }
+               for (const auto &[event_id, content] : sse_messages) {
+                 int current_id_num = std::stoi(event_id);
+                 if (current_id_num <=
+                     std::stoi(
+                         sse_messages[index_of_last_event_id_if_exists]
+                             .first)) // inefficient code here honestly refactor
+                                      // this to something better later on ...
+                   continue;
+                 std::ostringstream chunk_oss;
+
+                 chunk_oss << std::hex << content.length() << "\r\n";
+
+                 chunk_oss << content << "\r\n";
+
+                 std::string chunk_data = chunk_oss.str();
+                 boost::asio::async_write(
+                     this->conn->conn_socket, boost::asio::buffer(chunk_data),
+                     [](const boost::system::error_code &ec,
+                        std::size_t bytes) {
+                       if (!ec) {
+                         std::cout << "SSE chunk sent " << std::endl;
+                       }
+                     });
+               }
+
+               std::string final_chunk = "0\r\n\r\n";
+               boost::asio::async_write(
+                   this->conn->conn_socket, boost::asio::buffer(final_chunk),
+                   [](const boost::system::error_code &ec, std::size_t bytes) {
+                     if (!ec) {
+                       std::cout << "final SSE chunk sent " << std::endl;
+                     }
+                   });
+             }},
+
+        };
     std::vector<PHASE> phase_link;
     void generate_unprocessed_default_response();
     void register_phase_handler(PHASE phase) { phase_link.push_back(phase); }
-    void apply_phase_handlers(int index = 0) {
+    void apply_phase_handlers(
+        int index = 0,
+        std::function<void()> next_in_global_chain_link = nullptr) {
       auto self = shared_from_this();
       if (phase_link.size() == 0)
         return;
-      if (index > phase_link.size())
+      if (index >= phase_link.size()) {
+        next_in_global_chain_link();
         return;
+      }
       auto cp = phase_link[index];
-      phase_handlers[cp](self->conn->res,
-                         [this, index , self]() { self->apply_phase_handlers(index + 1); });
+      phase_handlers[cp](
+          self->conn->res, [this, index, self, next_in_global_chain_link]() {
+            self->apply_phase_handlers(index + 1, next_in_global_chain_link);
+          });
     };
     void write_to_client() {
-      this->conn->res->send(); // rewrite this this to be more than default value , use
-                    // Response class itself
+      this->conn->res->send(); // rewrite this this to be more than default
+                               // value , use Response class itself
     };
   };
 
@@ -416,31 +657,37 @@ protected:
     });
   };
 
-  void API_HANDLER(const std::shared_ptr<Connection> &conn) {
-    boost::asio::post(this->io_context, [this, conn] {
-      // take care of the request handler for the endpoint /blah.....
-      if (conn->req->path.length() != 0) {
-        if (requesthandlercallback(conn->req->path, conn->req->method,
-                                   conn->req, conn->res))
-          std::cout << "Handler request processed" << std::endl;
-        else
-          default_callback(conn->req, conn->res);
-      }
-      // if (!conn->req->keepALive) {
-      //
-      //   conn->conn_socket.async_shutdown(
-      //       [this, conn](const boost::system::error_code &ec) {
-      //         if (!ec) {
-      //           conn->conn_socket.lowest_layer().close();
-      //         } else {
-      //           std::cout << ec.message() << std::endl;
-      //         }
-      //       });
-      //   connections_list.erase(std::remove_if(
-      //       connections_list.begin(), connections_list.end(),
-      //       [conn](const auto &n_conn) { return conn == n_conn; }));
-      // }
-    });
+  void API_HANDLER(const std::shared_ptr<Connection> &conn,
+                   std::function<void()> next_in_global_chain_link) {
+    boost::asio::post(
+        this->io_context, [this, conn, next_in_global_chain_link] {
+          // take care of the request handler for the endpoint /blah.....
+          if (conn->req->path.length() != 0) {
+            if (requesthandlercallback(conn->req->path, conn->req->method,
+                                       conn->req, conn->res)) {
+              std::cout << "Handler request processed" << std::endl;
+              conn->res->res_code = Response::RESPONSE_CODES::HTTP_200;
+            } else
+              default_callback(conn->req, conn->res);
+            conn->res->res_code = Response::RESPONSE_CODES::HTTP_404;
+          }
+
+          next_in_global_chain_link();
+          // if (!conn->req->keepALive) {
+          //
+          //   conn->conn_socket.async_shutdown(
+          //       [this, conn](const boost::system::error_code &ec) {
+          //         if (!ec) {
+          //           conn->conn_socket.lowest_layer().close();
+          //         } else {
+          //           std::cout << ec.message() << std::endl;
+          //         }
+          //       });
+          //   connections_list.erase(std::remove_if(
+          //       connections_list.begin(), connections_list.end(),
+          //       [conn](const auto &n_conn) { return conn == n_conn; }));
+          // }
+        });
   }
 
   bool requesthandlercallback(std::string &regex, std::string &method,
@@ -481,32 +728,69 @@ protected:
         });
   }
 
-  using Task = std::function<void(std::function<void()>)>;
-  
-  void run_chain(std::deque<Task> sequence){
-
-      auto current_task = std::move(sequence.front());
-      sequence.pop_front();
-      
-      current_task([tasks = std::move(sequence), this ]() mutable{
-                  run_chain(tasks);
-      });
-
+  void Initating_handler_for_Tasks(std::shared_ptr<Connection> &conn) {
+    boost::asio::post(this->io_context, [conn, this]() mutable {
+      this->processor_generator_handler(conn);
+      if (conn->req->request_parsed["Keep-alive"] == "True" &&
+          conn->conn_socket.lowest_layer().is_open()) {
+        Initating_handler_for_Tasks(conn);
+      }else{
+       // connection termination here form the connection_list
+      }
+    });
   }
 
+  // Main request-response (processor & generator) function
+  using Task = std::function<void(std::function<void()>)>;
+
+  void run_chain(std::deque<Task> sequence) {
+    auto current_task = std::move(sequence.front());
+    sequence.pop_front();
+
+    current_task(
+        [tasks = std::move(sequence), this]() mutable { run_chain(tasks); });
+  }
 
   void processor_generator_handler(const std::shared_ptr<Connection> &conn) {
     auto processor = std::make_shared<Processor>(conn);
     auto generator = std::make_shared<Generator>(conn);
 
     processor->register_filter(Processor::FILTERS::PARSE_HEADER);
-    processor->apply_filters();
 
-    std::cout << "API_H" << std::endl; 
-    API_HANDLER(conn);
-    std::cout << "Gen:" << std::endl;
-    generator->apply_phase_handlers();
-    generator->write_to_client();
+    std::deque<Task> sequence;
+
+    sequence.push_back([processor](auto next_in_global_chain_link) {
+      processor->apply_filters(0, next_in_global_chain_link);
+    });
+
+    auto server_hosting = std::find(processor->filter_chain.begin(),
+                                    processor->filter_chain.end(),
+                                    Processor::FILTERS::STATIC_SERVING);
+    auto sse =
+        std::find(processor->filter_chain.begin(),
+                  processor->filter_chain.end(), Processor::FILTERS::SSE);
+    if (server_hosting != processor->filter_chain.end()) {
+      generator->register_phase_handler(Generator::PHASE::STATIC_SERVER);
+
+    } else if (sse != processor->filter_chain.end()) {
+      generator->register_phase_handler(Generator::PHASE::SSE);
+      sequence.push_back([generator](auto next_in_global_chain_link) {
+        generator->apply_phase_handlers(0, next_in_global_chain_link);
+      });
+    } else {
+      std::cout << "API_H" << std::endl;
+      sequence.push_back([this, conn](auto next_in_global_chain_link) {
+        this->API_HANDLER(conn, next_in_global_chain_link);
+      });
+      generator->register_phase_handler(
+          Generator::PHASE::RESPONSE_WRITE_TO_CLIENT);
+      std::cout << "Gen:" << std::endl;
+      sequence.push_back([generator](auto next_in_global_chain_link) {
+        generator->apply_phase_handlers(0, next_in_global_chain_link);
+      });
+    }
+
+    run_chain(sequence);
   }
 
   void log_info_tls(
