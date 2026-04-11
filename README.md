@@ -18,7 +18,7 @@
 ## SUBNOTES
 - [x] Refactor current simple navie (request->parser->server API callback ->response) code flow to modular (Request -> Filters module -> Upstream API module -> Generator Module)
 - [x] HTTP /1.1 (simple stuff :| )
-- [ ] TLS handshake Testing ...
+- [x] TLS handshake Testing ...
 - [ ] internal Caching inspired by nginx 
 - [ ] Complete Test suite for SSE, STATIC HOSTING .
 - [x] Transfer encoding 
