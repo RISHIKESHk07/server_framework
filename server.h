@@ -486,18 +486,23 @@ protected:
                  response += "\r\n";
                  // send a switching message which just sends the protocol
                  // nogotiation and no extension
+                 std::cout << response.c_str() << std::endl;
                  auto response_ptr =
                      std::make_shared<std::string>(std::move(response));
 
+                 
                  boost::asio::async_write(
                      this->conn->conn_socket,
                      boost::asio::buffer(*response_ptr),
-                     [response_ptr, this](const boost::system::error_code &ec,
+                     [response_ptr, this,next](const boost::system::error_code &ec,
                                           std::size_t /*bytes*/) {
                        if (!ec) {
                          // Handshake complete. Start your Frame Queue logic
                          // here, ehich is out WSS_BODY ... further processing
                          // at generator .
+                       std::cout << "Handshake WSS sent" << std::endl;
+                       next();
+
                        }
                      });
 
@@ -514,15 +519,17 @@ protected:
                      std::make_shared<std::string>(std::move(denied));
                  boost::asio::async_write(
                      this->conn->conn_socket, boost::asio::buffer(*denied_ptr),
-                     [denied_ptr](const boost::system::error_code &ec,
+                     [denied_ptr , next](const boost::system::error_code &ec,
                                   std::size_t) {
                        if (!ec) {
                          std::cout << "Failed Websocket Protocol Negotiation"
                                    << std::endl;
+                                   next();
+
                        }
                      });
-               }
-               next();
+                }
+               
              }},
 
         };
@@ -757,7 +764,7 @@ protected:
 
                      while (offset < string_size) {
                        int payload_chunk_size = std::min(
-                           125,
+                           1000,
                            string_size -
                                offset); // Not just chunk size as this is
                                         // for payload and we are trying
@@ -765,22 +772,12 @@ protected:
                                         // we add the stream int 32 bit 4
                                         // bytes to existing 125 bytes ...
                                         // we need to use length code 126
+                       size_t total_payload_size = 4 + payload_chunk_size;
                        struct wss_frame frame;
                        frame.FIN =
                            (offset + payload_chunk_size >= string_size) ? 1 : 0;
 
-                       if (offset == 0) {
-                         frame.RSV1 = 0;
-                         frame.RSV2 = 0;
-                         frame.RSV3 = 0;
-                         frame.OPCODE = 2;
-                       }
-
-                       else {
-                         frame.OPCODE = 0;
-                         frame.RSV1 = 0;
-                       }
-
+                       frame.OPCODE = (offset == 0) ? 2 : 0;
                        frame.MASK = 0;
                        frame.LENGTH = 126;
                        frame.EXTENDED_LENGTH =
@@ -789,6 +786,18 @@ protected:
                            msg.substr(offset, payload_chunk_size);
                        frame.py.STREAM_ID = streamid;
                        res_frames.push_back(frame);
+                       if (total_payload_size <= 125) {
+                         frame.LENGTH =
+                             static_cast<uint8_t>(total_payload_size);
+                         frame.EXTENDED_LENGTH = 0;
+                       } else if (total_payload_size <= 65535) {
+                         frame.LENGTH = 126;
+                         frame.EXTENDED_LENGTH =
+                             static_cast<uint16_t>(total_payload_size);
+                       } else {
+                         frame.LENGTH = 126;
+                         frame.EXTENDED_LENGTH = 65535;
+                       }
                        offset += payload_chunk_size;
                      }
 
@@ -801,226 +810,248 @@ protected:
                write_frame = std::make_shared<std::function<void(
                    std::shared_ptr<std::deque<std::vector<wss_frame>>>)>>();
 
-          *write_frame =             [this, write_frame](
-                 std::shared_ptr<std::deque<std::vector<wss_frame>>> DQ) {
-        while (!DQ->empty()) {
-          std::cout << "Started writing wss frame here ..." << std::endl;
-          auto vec_msgs = DQ->front();
-          DQ->pop_front();
-          for (auto i = 0; i < vec_msgs.size(); i++) {
-            // boost async write here send each chunk acordingly
+               *write_frame =
+                   [this, write_frame](
+                       std::shared_ptr<std::deque<std::vector<wss_frame>>> DQ) {
+                     while (!DQ->empty()) {
+                       std::cout << "Started writing wss frame here ..."
+                                 << std::endl;
+                       auto vec_msgs = DQ->front();
+                       DQ->pop_front();
+                       for (auto i = 0; i < vec_msgs.size(); i++) {
+                         // boost async write here send each chunk acordingly
 
-            std::vector<uint8_t> wire_buffer;
-            // [FIN(1) | RSV1(1) | RSV2(1) | RSV3(1) | OPCODE(4)]
-            uint8_t byte0 = 0;
-            byte0 |= (vec_msgs[i].FIN & 0x01) << 7;
-            byte0 |= (vec_msgs[i].RSV1 & 0x01) << 6;
-            byte0 |= (vec_msgs[i].RSV2 & 0x01) << 5;
-            byte0 |= (vec_msgs[i].RSV3 & 0x01) << 4;
-            byte0 |= (vec_msgs[i].OPCODE & 0x0F);
-            wire_buffer.push_back(byte0);
+                         std::vector<uint8_t> wire_buffer;
+                         // [FIN(1) | RSV1(1) | RSV2(1) | RSV3(1) | OPCODE(4)]
+                         uint8_t byte0 = 0;
+                         byte0 |= (vec_msgs[i].FIN & 0x01) << 7;
+                         byte0 |= (vec_msgs[i].RSV1 & 0x01) << 6;
+                         byte0 |= (vec_msgs[i].RSV2 & 0x01) << 5;
+                         byte0 |= (vec_msgs[i].RSV3 & 0x01) << 4;
+                         byte0 |= (vec_msgs[i].OPCODE & 0x0F);
+                         wire_buffer.push_back(byte0);
 
-            uint8_t byte1 = 0;
-            byte1 |= (vec_msgs[i].MASK & 0x01) << 7;
+                         uint8_t byte1 = 0;
+                         byte1 |= (vec_msgs[i].MASK & 0x01) << 7;
 
-            uint8_t byte01 = 0;
-            byte01 |= (static_cast<uint8_t>(vec_msgs[i].LENGTH) & 0x7F);
-            wire_buffer.push_back(byte01);
+                         uint8_t byte01 = 0;
+                         byte01 |=
+                             (static_cast<uint8_t>(vec_msgs[i].LENGTH) & 0x7F);
+                         wire_buffer.push_back(byte01);
 
-            byte1 |= (static_cast<uint8_t>(vec_msgs[i].EXTENDED_LENGTH) & 0x7F);
-            wire_buffer.push_back(byte1);
+                         byte1 |= (static_cast<uint8_t>(
+                                       vec_msgs[i].EXTENDED_LENGTH) &
+                                   0x7F);
+                         wire_buffer.push_back(byte1);
 
-            uint32_t network_sid = htonl(vec_msgs[i].py.STREAM_ID);
-            uint8_t *sid_bytes = reinterpret_cast<uint8_t *>(&network_sid);
-            wire_buffer.insert(wire_buffer.end(), sid_bytes, sid_bytes + 4);
+                         uint32_t network_sid = htonl(vec_msgs[i].py.STREAM_ID);
+                         uint8_t *sid_bytes =
+                             reinterpret_cast<uint8_t *>(&network_sid);
+                         wire_buffer.insert(wire_buffer.end(), sid_bytes,
+                                            sid_bytes + 4);
 
-            const uint8_t *string_bytes = reinterpret_cast<const uint8_t *>(
-                vec_msgs[i].py.payload.data());
-            wire_buffer.insert(wire_buffer.end(), string_bytes,
-                               string_bytes + vec_msgs[i].py.payload.size());
+                         const uint8_t *string_bytes =
+                             reinterpret_cast<const uint8_t *>(
+                                 vec_msgs[i].py.payload.data());
+                         wire_buffer.insert(wire_buffer.end(), string_bytes,
+                                            string_bytes +
+                                                vec_msgs[i].py.payload.size());
 
-            std::cout << "--- Wire Buffer (Size: " << wire_buffer.size()
-                      << ") ---" << std::endl;
+                         std::cout
+                             << "--- Wire Buffer (Size: " << wire_buffer.size()
+                             << ") ---" << std::endl;
 
-            for (size_t i = 0; i < wire_buffer.size(); ++i) {
-              // Print each byte as a 2-digit Hexadecimal value
-              std::cout << std::hex << std::setw(2) << std::setfill('0')
-                        << static_cast<int>(wire_buffer[i]) << " ";
+                         for (size_t i = 0; i < wire_buffer.size(); ++i) {
+                           // Print each byte as a 2-digit Hexadecimal value
+                           std::cout << std::hex << std::setw(2)
+                                     << std::setfill('0')
+                                     << static_cast<int>(wire_buffer[i]) << " ";
 
-              // Optional: Print a newline every 8 bytes for
-              // readability
-              if ((i + 1) % 8 == 0)
-                std::cout << std::endl;
-            }
+                           // Optional: Print a newline every 8 bytes for
+                           // readability
+                           if ((i + 1) % 8 == 0)
+                             std::cout << std::endl;
+                         }
 
-            std::cout << std::dec << "\n----------------------------------"
-                      << std::endl;
+                         std::cout << std::dec
+                                   << "\n----------------------------------"
+                                   << std::endl;
 
-            boost::asio::async_write(
-                this->conn->conn_socket,
-                boost::asio::buffer(wire_buffer.data(), wire_buffer.size()),
-                [DQ, write_frame](const boost::system::error_code &ec,
-                                  size_t bytes) {
-                  if (!ec) {
-                  }
-                });
-          }
-        }
-        boost::asio::post(this->conn->conn_socket.get_executor(),
-                          [write_frame, DQ]() {
-                            std::cout << "writing func of wss ..." << std::endl;
-                            (*write_frame)(DQ);
-                          });
-        // start boost post here for write frame again
-             };
+                         boost::asio::async_write(
+                             this->conn->conn_socket,
+                             boost::asio::buffer(wire_buffer.data(),
+                                                 wire_buffer.size()),
+                             [DQ,
+                              write_frame](const boost::system::error_code &ec,
+                                           size_t bytes) {
+                               if (!ec) {
+                                 std::cout << "Chunk sent" << std::endl;
+                               }
+                             });
+                       }
+                     } 
+                   };
 
-          std::shared_ptr<std::function<void()>> compress_frame;
-          // reading frames and reconstruction ...
-          std::shared_ptr<std::function<void(
-              std::shared_ptr<std::deque<std::vector<wss_frame>>>)>>
-              reader_from_line = std::make_shared<std::function<void(
-                  std::shared_ptr<std::deque<std::vector<
-                      wss_frame>>>)>>([this, write_frame, create_frame](
-                                          std::shared_ptr<std::deque<
-                                              std::vector<wss_frame>>>
-                                              DQ) {
-                boost::asio::post(this->conn->conn_socket.get_executor(), [this,
-                                                                           DQ]() {
-                  struct ReadState {
-                    std::vector<wss_frame> current_message_frames;
-                    uint8_t header[2];
-                  };
-                  auto state = std::make_shared<ReadState>();
+               std::shared_ptr<std::function<void()>> compress_frame;
+               // reading frames and reconstruction ...
+               std::shared_ptr<std::function<void(
+                   std::shared_ptr<std::deque<std::vector<wss_frame>>> , std::function<void()>)>>
+                   reader_from_line;
+               reader_from_line = std::make_shared<std::function<void(
+                   std::shared_ptr<std::deque<std::vector<wss_frame>>> , std::function<void()>)>>([this, write_frame, create_frame,
+                                     reader_from_line](
+                                        std::shared_ptr<
+                                            std::deque<std::vector<wss_frame>>>
+                                            DQ , std::function<void()> next) {
+                 boost::asio::post(
+                     this->conn->conn_socket.get_executor(),
+                     [this, DQ, reader_from_line,next]() {
+                       std::function<void()> read_next_frame = [this, DQ,
+                                                                &read_next_frame,
+                                                                reader_from_line,next]() {
+                         struct ReadState {
+                           std::vector<wss_frame> current_message_frames;
+                           uint8_t header[2];
+                         };
+                         auto state = std::make_shared<ReadState>();
 
-                  std::function<void()> read_next_frame = [this, state, DQ,
-                                                           &read_next_frame]() {
-                    boost::asio::async_read(
-                        this->conn->conn_socket,
-                        boost::asio::buffer(state->header, 2),
-                        [this, state, DQ, read_next_frame](
-                            boost::system::error_code ec, size_t) {
-                          if (ec)
-                            return;
+                         boost::asio::async_read(
+                             this->conn->conn_socket,
+                             boost::asio::buffer(state->header, 2),
+                             [this, state, DQ, read_next_frame,
+                              reader_from_line,next](boost::system::error_code ec,
+                                                size_t) {
+                               if (ec){
+                                 std::cout << "error_code" << ec.message() << std::endl;
+                                 return; }
 
-                          wss_frame frame;
-                          frame.FIN = (state->header[0] >> 7) & 0x01;
-                          frame.OPCODE = state->header[0] & 0x0F;
+                               wss_frame frame;
+                               frame.FIN = (state->header[0] >> 7) & 0x01;
+                               frame.OPCODE = state->header[0] & 0x0F;
 
-                          auto ext_len_buf = std::make_shared<uint16_t>();
-                          boost::asio::async_read(
-                              this->conn->conn_socket,
-                              boost::asio::buffer(ext_len_buf.get(), 2),
-                              [this, state, DQ, frame, ext_len_buf,
-                               read_next_frame](boost::system::error_code ec,
-                                                size_t) mutable {
-                                if (ec)
-                                  return;
+                               auto ext_len_buf = std::make_shared<uint16_t>();
+                               boost::asio::async_read(
+                                   this->conn->conn_socket,
+                                   boost::asio::buffer(ext_len_buf.get(), 2),
+                                   [this, state, DQ, frame, ext_len_buf,
+                                    read_next_frame, reader_from_line,next](
+                                       boost::system::error_code ec,
+                                       size_t) mutable {
+                                     if (ec)
+                                       return;
 
-                                frame.EXTENDED_LENGTH = ntohs(*ext_len_buf);
+                                     frame.EXTENDED_LENGTH =
+                                         ntohs(*ext_len_buf);
 
-                                auto full_payload =
-                                    std::make_shared<std::vector<uint8_t>>(
-                                        frame.EXTENDED_LENGTH);
-                                boost::asio::async_read(
-                                    this->conn->conn_socket,
-                                    boost::asio::buffer(full_payload->data(),
-                                                        full_payload->size()),
-                                    [this, state, DQ, frame, full_payload,
-                                     read_next_frame](
-                                        boost::system::error_code ec,
-                                        size_t) mutable {
-                                      if (ec)
-                                        return;
+                                     auto full_payload =
+                                         std::make_shared<std::vector<uint8_t>>(
+                                             frame.EXTENDED_LENGTH);
+                                     boost::asio::async_read(
+                                         this->conn->conn_socket,
+                                         boost::asio::buffer(
+                                             full_payload->data(),
+                                             full_payload->size()),
+                                         [this, state, DQ, frame, full_payload,
+                                          read_next_frame, reader_from_line,next](
+                                             boost::system::error_code ec,
+                                             size_t) mutable {
+                                           if (ec)
+                                             return;
 
-                                      // Extract StreamID
-                                      uint32_t net_sid;
-                                      std::memcpy(&net_sid,
-                                                  full_payload->data(), 4);
-                                      frame.py.STREAM_ID = ntohl(net_sid);
+                                           // Extract StreamID
+                                           uint32_t net_sid;
+                                           std::memcpy(&net_sid,
+                                                       full_payload->data(), 4);
+                                           frame.py.STREAM_ID = ntohl(net_sid);
 
-                                      // Extract Data
-                                      frame.py.payload.assign(
-                                          reinterpret_cast<char *>(
-                                              full_payload->data() + 4),
-                                          full_payload->size() - 4);
+                                           // Extract Data
+                                           frame.py.payload.assign(
+                                               reinterpret_cast<char *>(
+                                                   full_payload->data() + 4),
+                                               full_payload->size() - 4);
 
-                                      state->current_message_frames.push_back(
-                                          std::move(frame));
+                                           state->current_message_frames
+                                               .push_back(std::move(frame));
 
-                                      if (state->current_message_frames.back()
-                                              .FIN == 1) {
-                                        std::string final_msg;
-                                        for (auto &f :
-                                             state->current_message_frames) {
-                                          final_msg += f.py.payload;
-                                        }
-                                        std::cout << "Reconstructed message: "
-                                                  << final_msg << std::endl;
+                                           if (state->current_message_frames
+                                                   .back()
+                                                   .FIN == 1) {
+                                             std::string final_msg;
+                                             for (
+                                                 auto &f :
+                                                 state
+                                                     ->current_message_frames) {
+                                               final_msg += f.py.payload;
+                                             }
+                                             std::cout
+                                                 << "Reconstructed message: "
+                                                 << final_msg << std::endl;
 
-                                        DQ->push_back(std::move(
-                                            state->current_message_frames));
+                                             DQ->push_back(std::move(
+                                                 state
+                                                     ->current_message_frames));
 
-                                        state->current_message_frames.clear();
-                                        boost::asio::post(
-                                            this->conn->conn_socket
-                                                .get_executor(),
-                                            [read_next_frame]() {
-                                              read_next_frame();
-                                            });
+                                             state->current_message_frames
+                                                 .clear();
+                                             if(state->current_message_frames.back().OPCODE != 8){ // if opcode is 8 we want to stop the stream as advised by client as client ... we need next in the ping & pong flow as well .
+                                             boost::asio::post(
+                                                 this->conn->conn_socket
+                                                     .get_executor(),
+                                                 [reader_from_line, DQ,next]() {
+                                                   (*reader_from_line)(DQ,next);
+                                                 });
+                                             }else{
+                                               next();
+                                             }
 
-                                      } else {
-                                        read_next_frame();
-                                      }
-                                    });
-                              });
-                        });
+                                           } else {
+                                             read_next_frame();
+                                           }
+                                         });
+                                   });
+                             });
+                         read_next_frame();                       };
+                     });
+               }); 
+               std::shared_ptr<std::function<void(std::function<void()>)>>
+                   ws_handler;
+               ws_handler = std::make_shared<std::function<void(
+                   std::function<void()>)>>([this, write_frame, create_frame,
+                                             reader_from_line](auto next) {
+                 std::shared_ptr<std::deque<std::vector<wss_frame>>>
+                     Write_queue =
+                         std::make_shared<std::deque<std::vector<wss_frame>>>();
+                 std::shared_ptr<std::deque<std::vector<wss_frame>>>
+                     Read_queue =
+                         std::make_shared<std::deque<std::vector<wss_frame>>>();
 
-                    boost::asio::post(
-                        this->conn->conn_socket.get_executor(),
-                        [read_next_frame]() { read_next_frame(); });
-                  };
-                });
-              });
+                 std::string message = "hello world from my wss";
+                 std::cout << "WSS execution started ..." << std::endl;
+                 // operation we are sending to
+                 // client , this could be any
+                 // other db,or calcualtion do
+                 // you for your client , we will
+                 // use a handler in place here
+                 auto msg_frams = (*create_frame)(message, 1);
+                 Write_queue->push_back(msg_frams);
+                 (*write_frame)(Write_queue);
+                 // ...
+                 // simentaneos read and write .... and we use deques and
+                 // ping & pong using timestamps before every read and
+                 // write operation based on timestamp , if we have not
+                 // done a read or write in the last interval we do a
+                 // autumatic heartbeat if we did a read or write its fine
+                 // . create_frame -> vector of frames vector of frames ->
+                 // into a deque write function
+                 (*reader_from_line)(Read_queue , next);
+                 // read continoulsy for getting the client 's message ,
+                 // decompress , build message from res_frames add messages
+                 // to a read deque call a client use handler for embedding
+                 // the custom logic .
+               });
 
-          std::shared_ptr<std::function<void()>> ws_handler;
-          ws_handler = std::make_shared<std::function<void()>>(
-              [this, write_frame, create_frame, reader_from_line]() {
-                std::shared_ptr<std::deque<std::vector<wss_frame>>>
-                    Write_queue =
-                        std::make_shared<std::deque<std::vector<wss_frame>>>();
-                std::shared_ptr<std::deque<std::vector<wss_frame>>> Read_queue =
-                    std::make_shared<std::deque<std::vector<wss_frame>>>();
-
-                std::string message = "hello world from my wss";
-                std::cout << "WSS execution started ..." << std::endl;
-                // operation we are sending to
-                // client , this could be any
-                // other db,or calcualtion do
-                // you for your client , we will
-                // use a handler in place here
-                auto msg_frams = (*create_frame)(message, 1);
-                Write_queue->push_back(msg_frams);
-                (*write_frame)(Write_queue);
-                // ...
-                // simentaneos read and write .... and we use deques and
-                // ping & pong using timestamps before every read and
-                // write operation based on timestamp , if we have not
-                // done a read or write in the last interval we do a
-                // autumatic heartbeat if we did a read or write its fine
-                // . create_frame -> vector of frames vector of frames ->
-                // into a deque write function
-                (*reader_from_line)(Read_queue);
-                // read continoulsy for getting the client 's message ,
-                // decompress , build message from res_frames add messages
-                // to a read deque call a client use handler for embedding
-                // the custom logic .
-              });
-
-          boost::asio::post(this->conn->conn_socket.get_executor(),
-                            [next, ws_handler]() {
-                              (*ws_handler)();
-                              next();
-                            });
+               boost::asio::post(this->conn->conn_socket.get_executor(),
+                                 [next, ws_handler]() { (*ws_handler)(next); });
              }}};
     std::vector<PHASE> phase_link;
     void generate_unprocessed_default_response();
@@ -1037,7 +1068,7 @@ protected:
       }
       auto cp = phase_link[index];
       phase_handlers[cp](
-          self->conn->res, [ index, self, next_in_global_chain_link]() {
+          self->conn->res, [index, self, next_in_global_chain_link]() {
             self->apply_phase_handlers(index + 1, next_in_global_chain_link);
           });
     };

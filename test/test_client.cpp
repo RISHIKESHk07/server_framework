@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
               boost::asio::ssl::stream_base::client,
               [&socket, argv](const boost::system::error_code &ec) {
                 if (!ec) {
-                  std::cout << "handshake ... complete" << std::endl;
+                  std::cout << "tls handshake ... complete" << std::endl;
                   std::string_view cmd = argv[1];
 
                   if (cmd == "g") {
@@ -182,14 +182,17 @@ int main(int argc, char *argv[]) {
 
                     boost::asio::async_write(
                         socket, *writebuf,
-                        [&](const boost::system::error_code &ec, std::size_t) {
+                        [& , readbuf , writebuf](const boost::system::error_code &ec, std::size_t) {
                           if (ec)
                             return;
 
                           // 2. Wait for 101 Switching Protocols
+                          std::cout << "waiting switching protocols "
+                                       "confirmation from server .."
+                                    << std::endl;
                           boost::asio::async_read_until(
                               socket, *readbuf, "\r\n\r\n",
-                              [&](const boost::system::error_code &ec,
+                              [&,readbuf , writebuf](const boost::system::error_code &ec,
                                   std::size_t bytes) {
                                 if (ec)
                                   return;
