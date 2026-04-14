@@ -15,9 +15,9 @@ auto send_wss_binary_frames =
       std::ostream os(writebuf.get());
 
       auto create_frame = [&](std::string_view data, uint32_t stream_id,
-                              bool fin) {
+                              bool fin , uint8_t opcode) {
         // Byte 0: FIN | RSV | Opcode (0x02 for binary)
-        uint8_t byte0 = (fin ? 0x80 : 0x00) | 0x02;
+        uint8_t byte0 = (fin ? 0x80 : 0x00) | opcode & 0x02;
         os.put(static_cast<char>(byte0));
 
         // Byte 1: Mask(0) | Length(126 for 16-bit extended)
@@ -32,13 +32,16 @@ auto send_wss_binary_frames =
         os.write(reinterpret_cast<const char *>(&net_sid), 4);
 
         // Payload
+        std::cout << byte0 << "--" << ext_len << std::endl; 
         os.write(data.data(), data.size());
       };
 
       // Frame 1: Partial data (FIN = 0)
-      create_frame("Stream part 1: Init", 1234, false);
+      create_frame("Stream part 1: Init", 1234, false , 0x02);
       // Frame 2: Final data (FIN = 1)
-      create_frame("Stream part 2: End", 1234, true);
+      create_frame("Stream part 2: End", 1234, true , 0x02);
+
+      create_frame("",1234,true,0x08);
 
       boost::asio::async_write(
           socket, *writebuf,
