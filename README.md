@@ -20,8 +20,11 @@
 - [x] HTTP /1.1 (simple stuff :| )
 - [x] TLS handshake Testing ...
 - [ ] internal Caching inspired by nginx 
-- [ ] Complete Test suite for SSE, STATIC HOSTING .
+- [x] Complete Test suite for SSE, STATIC HOSTING .
 - [x] Transfer encoding 
 - [] File transfer a large file using merkle using transfer encoding ... deferred for now because this reqiures me to write a separate client just for this as merkle tree compliant is an issue
 - [x] SSE for simple stream of text notifications
 - [x] Static file serving of assests .
+- [] Keep alive functionality and connection pooling
+- [] Session based processing
+- [] Wss ping/pong , read , write and reconnection .

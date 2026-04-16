@@ -1,5 +1,7 @@
 #include "boost/asio/buffers_iterator.hpp"
+#include "boost/asio/detail/chrono.hpp"
 #include "boost/asio/post.hpp"
+#include "boost/asio/steady_timer.hpp"
 #include "boost/asio/write.hpp"
 #include "boost/system/detail/error_code.hpp"
 #include <boost/asio.hpp>
@@ -13,6 +15,7 @@
 #include <boost/system/error_code.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <ctime>
 #include <deque>
 #include <fstream>
 #include <functional>
@@ -890,39 +893,68 @@ protected:
 
                std::shared_ptr<std::function<void()>> compress_frame;
                // reading frames and reconstruction ...
-               
-               
 
-
+               auto send_ping = std::make_shared<std::function<void(
+                   std::shared_ptr<std::deque<std::vector<wss_frame>>>)>>();
+               *send_ping =
+                   [create_frame, write_frame](
+                       std::shared_ptr<std::deque<std::vector<wss_frame>>>
+                           Sender_DQ) {
+                     std::string msg = "";
+                     auto ping_frames = (*create_frame)(
+                         msg, 12); // empty message is always one frame , so it
+                                   // fits the control frames properly .
+                     ping_frames.back().OPCODE = 0x09;
+                     Sender_DQ->push_back(ping_frames);
+                     (*write_frame)(Sender_DQ);
+                   };
 
                auto reader_from_line = std::make_shared<std::function<void(
                    std::shared_ptr<std::deque<std::vector<wss_frame>>>,
-                   std::function<void()>)>>();
+                   std::shared_ptr<std::deque<std::vector<wss_frame>>>,
+                   std::function<void()>,
+                   std::shared_ptr<boost::asio::steady_timer>)>>();
                *reader_from_line = ([this, write_frame, create_frame,
-                                     reader_from_line](
+                                     reader_from_line, send_ping](
+                                        std::shared_ptr<
+                                            std::deque<std::vector<wss_frame>>>
+                                            sender_DQ,
                                         std::shared_ptr<
                                             std::deque<std::vector<wss_frame>>>
                                             DQ,
-                                        std::function<void()> next) {
+                                        std::function<void()> next,
+                                        std::shared_ptr<
+                                            boost::asio::steady_timer>
+                                            timer) {
                  struct ReadState {
                    std::vector<wss_frame> current_message_frames;
                    uint8_t header[2];
                  };
                  auto state = std::make_shared<ReadState>();
-
+                 if (timer->expiry() <=
+                     boost::asio::steady_timer::clock_type::now()) {
+                   // meaining we did not get reply at all for the ping as if we
+                   // did timer_expiry does not occur until explicit closing
+                   std::cout << "Did not recieve pong in time so we are "
+                                "breaking the connection and moving forward"
+                             << std::endl;
+                   next();
+                 }
                  boost::asio::post(
                      this->conn->conn_socket.get_executor(),
-                     [this, DQ, reader_from_line, next, state]() {
-                       auto read_next_frame = std::make_shared<std::function<void()>>();
-                       *read_next_frame = [this, DQ,read_next_frame,
-                                                                reader_from_line,
-                                                                next, state]() {
+                     [this, DQ, reader_from_line, next, state, timer, send_ping,
+                      sender_DQ]() {
+                       auto read_next_frame =
+                           std::make_shared<std::function<void()>>();
+                       *read_next_frame = [this, DQ, read_next_frame,
+                                           reader_from_line, next, state, timer,
+                                           send_ping, sender_DQ]() {
                          boost::asio::async_read(
                              this->conn->conn_socket,
                              boost::asio::buffer(state->header, 2),
                              [this, state, DQ, read_next_frame,
-                              reader_from_line,
-                              next](boost::system::error_code ec, size_t) {
+                              reader_from_line, next, timer, send_ping,
+                              sender_DQ](boost::system::error_code ec, size_t) {
                                if (ec) {
                                  std::cout << "error_code" << ec.message()
                                            << std::endl;
@@ -940,9 +972,10 @@ protected:
                                    this->conn->conn_socket,
                                    boost::asio::buffer(ext_len_buf.get(), 2),
                                    [this, state, DQ, frame, ext_len_buf,
-                                    read_next_frame, reader_from_line,
-                                    next](boost::system::error_code ec,
-                                          size_t) mutable {
+                                    read_next_frame, reader_from_line, next,
+                                    timer, send_ping,
+                                    sender_DQ](boost::system::error_code ec,
+                                               size_t) mutable {
                                      if (ec)
                                        return;
 
@@ -959,8 +992,9 @@ protected:
                                              full_payload->size()),
                                          [this, state, DQ, frame, full_payload,
                                           read_next_frame, reader_from_line,
-                                          next](boost::system::error_code ec,
-                                                size_t) mutable {
+                                          next, timer, send_ping, sender_DQ](
+                                             boost::system::error_code ec,
+                                             size_t) mutable {
                                            if (ec)
                                              return;
                                            std::cout << "Reading payload"
@@ -979,6 +1013,38 @@ protected:
 
                                            state->current_message_frames
                                                .push_back(std::move(frame));
+                                           
+                                           bool pong_message =
+                                               (state->current_message_frames
+                                                    .back()
+                                                    .OPCODE ==
+                                                static_cast<uint8_t>(11));
+
+                                           if (pong_message) {
+
+                                             if (timer->expiry() <=
+                                                 boost::asio::steady_timer::
+                                                     clock_type::now()) {
+                                               std::cout
+                                                   << "Breaking connection "
+                                                      "as client has not "
+                                                      "responded in time .. "
+                                                   << std::endl;
+                                               state->current_message_frames
+                                                   .clear();
+                                               // moving to next in global
+                                               // chain , here we are breaking
+                                               // the connection of wss
+                                               // entirely
+                                               next();
+
+                                             } else {
+                                               (*send_ping)(sender_DQ);
+                                               timer->expires_after(
+                                                   boost::asio::chrono::seconds(
+                                                       45));
+                                             }
+                                           }
 
                                            if (state->current_message_frames
                                                    .back()
@@ -997,8 +1063,15 @@ protected:
                                              bool end_stream =
                                                  (state->current_message_frames
                                                       .back()
-                                                      .OPCODE != static_cast<uint8_t>(8));
-                                             std::cout << state->current_message_frames.back().OPCODE << std::endl; 
+                                                      .OPCODE !=
+                                                  static_cast<uint8_t>(8));
+
+                                             std::cout
+                                                 << state
+                                                        ->current_message_frames
+                                                        .back()
+                                                        .OPCODE
+                                                 << std::endl;
                                              DQ->push_back(std::move(
                                                  state
                                                      ->current_message_frames));
@@ -1022,10 +1095,11 @@ protected:
                                                boost::asio::post(
                                                    this->conn->conn_socket
                                                        .get_executor(),
-                                                   [reader_from_line, DQ,
-                                                    next]() {
-                                                     (*reader_from_line)(DQ,
-                                                                         next);
+                                                   [reader_from_line, DQ, next,
+                                                    timer, sender_DQ]() {
+                                                     (*reader_from_line)(
+                                                         sender_DQ, DQ, next,
+                                                         timer);
                                                    });
                                              } else {
                                                state->current_message_frames
@@ -1059,14 +1133,23 @@ protected:
                  std::shared_ptr<std::deque<std::vector<wss_frame>>>
                      Read_queue =
                          std::make_shared<std::deque<std::vector<wss_frame>>>();
+                 auto timer = std::make_shared<boost::asio::steady_timer>(
+                     this->conn->conn_socket.get_executor(),
+                     boost::asio::chrono::seconds(45));
 
                  std::string message = "hello world from my wss";
+                 std::string ping_message =
+                     ""; // empty as this for a control frame , payload is zero
+                         // its a single frame
                  std::cout << "WSS execution started ..." << std::endl;
                  // operation we are sending to
                  // client , this could be any
                  // other db,or calcualtion do
                  // you for your client , we will
                  // use a handler in place here
+                 auto inti_ping_frames = (*create_frame)(ping_message, 2);
+                 inti_ping_frames.back().OPCODE = 0x09;
+
                  auto msg_frams = (*create_frame)(message, 1);
                  Write_queue->push_back(msg_frams);
                  (*write_frame)(Write_queue);
@@ -1078,7 +1161,7 @@ protected:
                  // autumatic heartbeat if we did a read or write its fine
                  // . create_frame -> vector of frames vector of frames ->
                  // into a deque write function
-                 (*reader_from_line)(Read_queue, next);
+                 (*reader_from_line)(Write_queue, Read_queue, next, timer);
                  // read continoulsy for getting the client 's message ,
                  // decompress , build message from res_frames add messages
                  // to a read deque call a client use handler for embedding
