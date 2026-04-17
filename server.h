@@ -752,57 +752,51 @@ protected:
                  struct wss_payload py;
                };
 
-               std::shared_ptr<std::function<std::vector<wss_frame>(
-                   std::string & message, int stream_id)>>
-                   create_frame;
-               create_frame = std::make_shared<
-                   std::function<std::vector<wss_frame>(std::string &, int)>>(
-                   [](std::string &msg, int streamid) {
-                     std::vector<wss_frame> res_frames;
-                     int string_size = msg.size();
-                     int offset = 0;
+               auto create_frame = std::make_shared<
+                   std::function<std::vector<wss_frame>(std::string, int)>>();
 
-                     while (offset < string_size) {
-                       int payload_chunk_size = std::min(
-                           1000,
-                           string_size -
-                               offset); // Not just chunk size as this is
-                                        // for payload and we are trying
-                                        // to just create a frame , when
-                                        // we add the stream int 32 bit 4
-                                        // bytes to existing 125 bytes ...
-                                        // we need to use length code 126
-                       size_t total_payload_size = 4 + payload_chunk_size;
-                       struct wss_frame frame;
-                       frame.FIN =
-                           (offset + payload_chunk_size >= string_size) ? 1 : 0;
+               *create_frame = [](std::string msg, int streamid) {
+                 std::vector<wss_frame> res_frames;
+                 int string_size = msg.size();
+                 int offset = 0;
 
-                       frame.OPCODE = (offset == 0) ? 2 : 0;
-                       frame.MASK = 0;
-                       frame.LENGTH = 126;
-                       frame.EXTENDED_LENGTH =
-                           125 + 4; // bytes (payload+streamid)
-                       frame.py.payload =
-                           msg.substr(offset, payload_chunk_size);
-                       frame.py.STREAM_ID = streamid;
-                       res_frames.push_back(frame);
-                       if (total_payload_size <= 125) {
-                         frame.LENGTH =
-                             static_cast<uint8_t>(total_payload_size);
-                         frame.EXTENDED_LENGTH = 0;
-                       } else if (total_payload_size <= 65535) {
-                         frame.LENGTH = 126;
-                         frame.EXTENDED_LENGTH =
-                             static_cast<uint16_t>(total_payload_size);
-                       } else {
-                         frame.LENGTH = 126;
-                         frame.EXTENDED_LENGTH = 65535;
-                       }
-                       offset += payload_chunk_size;
-                     }
+                 while (offset < string_size) {
+                   int payload_chunk_size = std::min(
+                       1000,
+                       string_size - offset); // Not just chunk size as this is
+                                              // for payload and we are trying
+                                              // to just create a frame , when
+                                              // we add the stream int 32 bit 4
+                                              // bytes to existing 125 bytes ...
+                                              // we need to use length code 126
+                   size_t total_payload_size = 4 + payload_chunk_size;
+                   struct wss_frame frame;
+                   frame.FIN =
+                       (offset + payload_chunk_size >= string_size) ? 1 : 0;
 
-                     return res_frames;
-                   });
+                   frame.OPCODE = (offset == 0) ? 2 : 0;
+                   frame.MASK = 0;
+                   frame.LENGTH = 126;
+                   frame.EXTENDED_LENGTH = 125 + 4; // bytes (payload+streamid)
+                   frame.py.payload = msg.substr(offset, payload_chunk_size);
+                   frame.py.STREAM_ID = streamid;
+                   if (total_payload_size <= 125) {
+                     frame.LENGTH = static_cast<uint8_t>(total_payload_size);
+                     frame.EXTENDED_LENGTH = 0;
+                   } else if (total_payload_size <= 65535) {
+                     frame.LENGTH = 126;
+                     frame.EXTENDED_LENGTH =
+                         static_cast<uint16_t>(total_payload_size);
+                   } else {
+                     frame.LENGTH = 126;
+                     frame.EXTENDED_LENGTH = 65535;
+                   }
+                   res_frames.push_back(frame);
+                   offset += payload_chunk_size;
+                 }
+
+                 return res_frames;
+               };
 
                std::shared_ptr<std::function<void(
                    std::shared_ptr<std::deque<std::vector<wss_frame>>>)>>
@@ -901,10 +895,22 @@ protected:
                        std::shared_ptr<std::deque<std::vector<wss_frame>>>
                            Sender_DQ) {
                      std::string msg = "";
-                     auto ping_frames = (*create_frame)(
-                         msg, 12); // empty message is always one frame , so it
-                                   // fits the control frames properly .
-                     ping_frames.back().OPCODE = 0x09;
+                     std::cout << "h1" << std::endl;
+
+                     std::vector<wss_frame> ping_frames;
+                     wss_frame ping_frame;
+                     ping_frame.FIN = 0x01;
+                     ping_frame.OPCODE = 0x09;
+                     ping_frame.MASK = 0;
+                     ping_frame.LENGTH = 4;
+                     ping_frame.EXTENDED_LENGTH = 0;
+                     ping_frame.RSV1 = 0x00;
+                     ping_frame.RSV2 = 0x00;
+                     ping_frame.RSV3 = 0x00;
+                     ping_frame.py.STREAM_ID = 0;
+                     ping_frame.py.payload = "";
+                     ping_frames.push_back(ping_frame);
+
                      Sender_DQ->push_back(ping_frames);
                      (*write_frame)(Sender_DQ);
                    };
@@ -931,15 +937,12 @@ protected:
                    uint8_t header[2];
                  };
                  auto state = std::make_shared<ReadState>();
-                 if (timer->expiry() <=
-                     boost::asio::steady_timer::clock_type::now()) {
-                   // meaining we did not get reply at all for the ping as if we
-                   // did timer_expiry does not occur until explicit closing
-                   std::cout << "Did not recieve pong in time so we are "
-                                "breaking the connection and moving forward"
-                             << std::endl;
-                   next();
-                 }
+                 std::cout << "Timer metric:"
+                           << std::chrono::duration_cast<std::chrono::seconds>(
+                                  timer->expiry() -
+                                  boost::asio::chrono::steady_clock::now())
+                                  .count()
+                           << std::endl;
                  boost::asio::post(
                      this->conn->conn_socket.get_executor(),
                      [this, DQ, reader_from_line, next, state, timer, send_ping,
@@ -967,156 +970,296 @@ protected:
                                frame.FIN = (state->header[0] >> 7) & 0x01;
                                frame.OPCODE = state->header[0] & 0x0F;
                                std::cout << frame.OPCODE << std::endl;
-                               auto ext_len_buf = std::make_shared<uint16_t>();
-                               boost::asio::async_read(
-                                   this->conn->conn_socket,
-                                   boost::asio::buffer(ext_len_buf.get(), 2),
-                                   [this, state, DQ, frame, ext_len_buf,
-                                    read_next_frame, reader_from_line, next,
-                                    timer, send_ping,
-                                    sender_DQ](boost::system::error_code ec,
+
+                               frame.LENGTH = state->header[1] & 0x7F;
+
+                               if (frame.LENGTH != 125) {
+
+                                 auto ext_len_buf =
+                                     std::make_shared<uint16_t>();
+                                 boost::asio::async_read(
+                                     this->conn->conn_socket,
+                                     boost::asio::buffer(ext_len_buf.get(), 2),
+                                     [this, state, DQ, frame, ext_len_buf,
+                                      read_next_frame, reader_from_line, next,
+                                      timer, send_ping,
+                                      sender_DQ](boost::system::error_code ec,
+                                                 size_t) mutable {
+                                       if (ec)
+                                         return;
+
+                                       frame.EXTENDED_LENGTH =
+                                           ntohs(*ext_len_buf);
+
+                                       auto full_payload = std::make_shared<
+                                           std::vector<uint8_t>>(
+                                           frame.EXTENDED_LENGTH);
+                                       boost::asio::async_read(
+                                           this->conn->conn_socket,
+                                           boost::asio::buffer(
+                                               full_payload->data(),
+                                               full_payload->size()),
+                                           [this, state, DQ, frame,
+                                            full_payload, read_next_frame,
+                                            reader_from_line, next, timer,
+                                            send_ping, sender_DQ](
+                                               boost::system::error_code ec,
                                                size_t) mutable {
-                                     if (ec)
-                                       return;
+                                             if (ec)
+                                               return;
+                                             std::cout << "Reading payload"
+                                                       << std::endl;
+                                             // Extract StreamID
+                                             uint32_t net_sid;
+                                             std::memcpy(&net_sid,
+                                                         full_payload->data(),
+                                                         4);
+                                             frame.py.STREAM_ID =
+                                                 ntohl(net_sid);
 
-                                     frame.EXTENDED_LENGTH =
-                                         ntohs(*ext_len_buf);
+                                             // Extract Data
+                                             frame.py.payload.assign(
+                                                 reinterpret_cast<char *>(
+                                                     full_payload->data() + 4),
+                                                 full_payload->size() - 4);
 
-                                     auto full_payload =
-                                         std::make_shared<std::vector<uint8_t>>(
-                                             frame.EXTENDED_LENGTH);
-                                     boost::asio::async_read(
-                                         this->conn->conn_socket,
-                                         boost::asio::buffer(
-                                             full_payload->data(),
-                                             full_payload->size()),
-                                         [this, state, DQ, frame, full_payload,
-                                          read_next_frame, reader_from_line,
-                                          next, timer, send_ping, sender_DQ](
-                                             boost::system::error_code ec,
-                                             size_t) mutable {
-                                           if (ec)
-                                             return;
-                                           std::cout << "Reading payload"
-                                                     << std::endl;
-                                           // Extract StreamID
-                                           uint32_t net_sid;
-                                           std::memcpy(&net_sid,
-                                                       full_payload->data(), 4);
-                                           frame.py.STREAM_ID = ntohl(net_sid);
+                                             state->current_message_frames
+                                                 .push_back(std::move(frame));
 
-                                           // Extract Data
-                                           frame.py.payload.assign(
-                                               reinterpret_cast<char *>(
-                                                   full_payload->data() + 4),
-                                               full_payload->size() - 4);
-
-                                           state->current_message_frames
-                                               .push_back(std::move(frame));
-                                           
-                                           bool pong_message =
-                                               (state->current_message_frames
-                                                    .back()
-                                                    .OPCODE ==
-                                                static_cast<uint8_t>(11));
-
-                                           if (pong_message) {
-
-                                             if (timer->expiry() <=
-                                                 boost::asio::steady_timer::
-                                                     clock_type::now()) {
-                                               std::cout
-                                                   << "Breaking connection "
-                                                      "as client has not "
-                                                      "responded in time .. "
-                                                   << std::endl;
-                                               state->current_message_frames
-                                                   .clear();
-                                               // moving to next in global
-                                               // chain , here we are breaking
-                                               // the connection of wss
-                                               // entirely
-                                               next();
-
-                                             } else {
-                                               (*send_ping)(sender_DQ);
-                                               timer->expires_after(
-                                                   boost::asio::chrono::seconds(
-                                                       45));
-                                             }
-                                           }
-
-                                           if (state->current_message_frames
-                                                   .back()
-                                                   .FIN == 1) {
-                                             std::string final_msg;
-                                             for (
-                                                 auto &f :
-                                                 state
-                                                     ->current_message_frames) {
-                                               final_msg += f.py.payload;
-                                             }
-                                             std::cout
-                                                 << "Reconstructed message: "
-                                                 << final_msg << std::endl;
-
-                                             bool end_stream =
+                                             bool pong_message =
                                                  (state->current_message_frames
                                                       .back()
-                                                      .OPCODE !=
-                                                  static_cast<uint8_t>(8));
+                                                      .OPCODE ==
+                                                  static_cast<uint8_t>(11));
 
-                                             std::cout
-                                                 << state
-                                                        ->current_message_frames
-                                                        .back()
-                                                        .OPCODE
-                                                 << std::endl;
-                                             DQ->push_back(std::move(
-                                                 state
-                                                     ->current_message_frames));
+                                             if (pong_message) {
 
-                                             if (end_stream) { // if opcode is 8
-                                                               // we want to
-                                                               // stop the
-                                                               // stream as
-                                                               // advised by
-                                                               // client as
-                                                               // client ... we
-                                                               // need next in
-                                                               // the ping &
-                                                               // pong flow as
-                                                               // well .
-                                               state->current_message_frames
-                                                   .clear();
-                                               std::cout << "Register another "
-                                                            "read... wss "
-                                                         << std::endl;
-                                               boost::asio::post(
-                                                   this->conn->conn_socket
-                                                       .get_executor(),
-                                                   [reader_from_line, DQ, next,
-                                                    timer, sender_DQ]() {
-                                                     (*reader_from_line)(
-                                                         sender_DQ, DQ, next,
-                                                         timer);
-                                                   });
-                                             } else {
-                                               state->current_message_frames
-                                                   .clear();
-                                               std::cout
-                                                   << "moving to next global "
-                                                      "procedure after wss "
-                                                      "completion"
-                                                   << std::endl;
-                                               next();
+                                               if (timer->expiry() <=
+                                                   boost::asio::steady_timer::
+                                                       clock_type::now()) {
+                                                 std::cout
+                                                     << "Breaking connection "
+                                                        "as client has not "
+                                                        "responded in time .. "
+                                                     << std::endl;
+                                                 state->current_message_frames
+                                                     .clear();
+                                                 // moving to next in global
+                                                 // chain , here we are breaking
+                                                 // the connection of wss
+                                                 // entirely
+                                                 next();
+
+                                               } else {
+                                                 (*send_ping)(sender_DQ);
+                                                 timer->expires_after(
+                                                     boost::asio::chrono::
+                                                         seconds(45));
+                                               }
                                              }
 
-                                           } else {
-                                             (*read_next_frame)();
-                                           }
-                                         });
-                                   });
+                                             if (state->current_message_frames
+                                                     .back()
+                                                     .FIN == 1) {
+                                               std::string final_msg;
+                                               for (
+                                                   auto &f :
+                                                   state
+                                                       ->current_message_frames) {
+                                                 final_msg += f.py.payload;
+                                               }
+                                               std::cout
+                                                   << "Reconstructed message: "
+                                                   << final_msg << std::endl;
+
+                                               bool end_stream =
+                                                   (state
+                                                        ->current_message_frames
+                                                        .back()
+                                                        .OPCODE !=
+                                                    static_cast<uint8_t>(8));
+
+                                               std::cout
+                                                   << state
+                                                          ->current_message_frames
+                                                          .back()
+                                                          .OPCODE
+                                                   << std::endl;
+                                               DQ->push_back(std::move(
+                                                   state
+                                                       ->current_message_frames));
+
+                                               if (end_stream) { // if opcode is
+                                                                 // 8 we want to
+                                                                 // stop the
+                                                                 // stream as
+                                                                 // advised by
+                                                                 // client as
+                                                                 // client ...
+                                                                 // we need next
+                                                                 // in the ping
+                                                                 // & pong flow
+                                                                 // as well .
+                                                 state->current_message_frames
+                                                     .clear();
+                                                 std::cout
+                                                     << "Register another "
+                                                        "read... wss "
+                                                     << std::endl;
+                                                 boost::asio::post(
+                                                     this->conn->conn_socket
+                                                         .get_executor(),
+                                                     [reader_from_line, DQ,
+                                                      next, timer,
+                                                      sender_DQ]() {
+                                                       (*reader_from_line)(
+                                                           sender_DQ, DQ, next,
+                                                           timer);
+                                                     });
+                                               } else {
+                                                 state->current_message_frames
+                                                     .clear();
+                                                 std::cout
+                                                     << "moving to next global "
+                                                        "procedure after wss "
+                                                        "completion"
+                                                     << std::endl;
+                                                 next();
+                                               }
+
+                                             } else {
+                                               (*read_next_frame)();
+                                             }
+                                           });
+                                     });
+                               } else {
+                                 frame.EXTENDED_LENGTH = ntohs(0);
+
+                                 auto full_payload =
+                                     std::make_shared<std::vector<uint8_t>>(
+                                         frame.LENGTH);
+                                 boost::asio::async_read(
+                                     this->conn->conn_socket,
+                                     boost::asio::buffer(full_payload->data(),
+                                                         full_payload->size()),
+                                     [this, state, DQ, frame, full_payload,
+                                      read_next_frame, reader_from_line, next,
+                                      timer, send_ping,
+                                      sender_DQ](boost::system::error_code ec,
+                                                 size_t) mutable {
+                                       if (ec)
+                                         return;
+                                       std::cout << "Reading payload"
+                                                 << std::endl;
+                                       // Extract StreamID
+                                       uint32_t net_sid;
+                                       std::memcpy(&net_sid,
+                                                   full_payload->data(), 4);
+                                       frame.py.STREAM_ID = ntohl(net_sid);
+
+                                       // Extract Data
+                                       frame.py.payload.assign(
+                                           reinterpret_cast<char *>(
+                                               full_payload->data() + 4),
+                                           full_payload->size() - 4);
+
+                                       state->current_message_frames.push_back(
+                                           std::move(frame));
+
+                                       bool pong_message =
+                                           (state->current_message_frames.back()
+                                                .OPCODE ==
+                                            static_cast<uint8_t>(11));
+
+                                       if (pong_message) {
+
+                                         if (timer->expiry() <=
+                                             boost::asio::steady_timer::
+                                                 clock_type::now()) {
+                                           std::cout << "Breaking connection "
+                                                        "as client has not "
+                                                        "responded in time .. "
+                                                     << std::endl;
+                                           state->current_message_frames
+                                               .clear();
+                                           // moving to next in global
+                                           // chain , here we are breaking
+                                           // the connection of wss
+                                           // entirely
+                                           next();
+
+                                         } else {
+                                           (*send_ping)(sender_DQ);
+                                           timer->expires_after(
+                                               boost::asio::chrono::seconds(
+                                                   45));
+                                         }
+                                       }
+
+                                       if (state->current_message_frames.back()
+                                               .FIN == 1) {
+                                         std::string final_msg;
+                                         for (auto &f :
+                                              state->current_message_frames) {
+                                           final_msg += f.py.payload;
+                                         }
+                                         std::cout << "Reconstructed message: "
+                                                   << final_msg << std::endl;
+
+                                         bool end_stream =
+                                             (state->current_message_frames
+                                                  .back()
+                                                  .OPCODE !=
+                                              static_cast<uint8_t>(8));
+
+                                         std::cout
+                                             << state->current_message_frames
+                                                    .back()
+                                                    .OPCODE
+                                             << std::endl;
+                                         DQ->push_back(std::move(
+                                             state->current_message_frames));
+
+                                         if (end_stream) { // if opcode is 8
+                                                           // we want to
+                                                           // stop the
+                                                           // stream as
+                                                           // advised by
+                                                           // client as
+                                                           // client ... we
+                                                           // need next in
+                                                           // the ping &
+                                                           // pong flow as
+                                                           // well .
+                                           state->current_message_frames
+                                               .clear();
+                                           std::cout << "Register another "
+                                                        "read... wss "
+                                                     << std::endl;
+                                           boost::asio::post(
+                                               this->conn->conn_socket
+                                                   .get_executor(),
+                                               [reader_from_line, DQ, next,
+                                                timer, sender_DQ]() {
+                                                 (*reader_from_line)(sender_DQ,
+                                                                     DQ, next,
+                                                                     timer);
+                                               });
+                                         } else {
+                                           state->current_message_frames
+                                               .clear();
+                                           std::cout << "moving to next global "
+                                                        "procedure after wss "
+                                                        "completion"
+                                                     << std::endl;
+                                           next();
+                                         }
+
+                                       } else {
+                                         (*read_next_frame)();
+                                       }
+                                     });
+                               }
                              });
                        };
                        (*read_next_frame)();
@@ -1126,7 +1269,8 @@ protected:
                    ws_handler;
                ws_handler = std::make_shared<std::function<void(
                    std::function<void()>)>>([this, write_frame, create_frame,
-                                             reader_from_line](auto next) {
+                                             reader_from_line,
+                                             send_ping](auto next) {
                  std::shared_ptr<std::deque<std::vector<wss_frame>>>
                      Write_queue =
                          std::make_shared<std::deque<std::vector<wss_frame>>>();
@@ -1134,21 +1278,38 @@ protected:
                      Read_queue =
                          std::make_shared<std::deque<std::vector<wss_frame>>>();
                  auto timer = std::make_shared<boost::asio::steady_timer>(
-                     this->conn->conn_socket.get_executor(),
-                     boost::asio::chrono::seconds(45));
+                     this->conn->conn_socket.get_executor());
+
+                 timer->expires_after(boost::asio::chrono::seconds(45));
+
+                 timer->async_wait([timer,next](
+                                       const boost::system::error_code &ec) {
+                   if (!ec) {                     auto expiry_time = timer->expiry();
+                     auto count =
+                         std::chrono::duration_cast<std::chrono::seconds>(
+                             expiry_time.time_since_epoch())
+                             .count();
+
+                     std::cout << "Pong was not recieved so we break connection ...time_duration_passed:" << count
+                               << std::endl;
+                      next();
+
+                   } else {
+                     std::cout << "Timer cancelled or error: " << ec.message()
+                               << std::endl;
+                   }
+                 });
 
                  std::string message = "hello world from my wss";
-                 std::string ping_message =
-                     ""; // empty as this for a control frame , payload is zero
-                         // its a single frame
-                 std::cout << "WSS execution started ..." << std::endl;
+                 std::cout << "WSS execution started ... timer was started "
+                           << std::endl;
                  // operation we are sending to
                  // client , this could be any
                  // other db,or calcualtion do
                  // you for your client , we will
                  // use a handler in place here
-                 auto inti_ping_frames = (*create_frame)(ping_message, 2);
-                 inti_ping_frames.back().OPCODE = 0x09;
+                 (*send_ping)(Write_queue);
+                 std::cout << "PING intiated" << std::endl;
 
                  auto msg_frams = (*create_frame)(message, 1);
                  Write_queue->push_back(msg_frams);

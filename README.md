@@ -27,4 +27,5 @@
 - [x] Static file serving of assests .
 - [] Keep alive functionality and connection pooling
 - [] Session based processing
-- [] Wss ping/pong , read , write and reconnection .
+- [] Wss ping/pong , read , write and reconnection along with replay .
+- [] Compression in wss , for strings and binary & wss does not use masking key & wss streamId is driven by client right now , so we need server to be able to know this and reply correctly if needed. 

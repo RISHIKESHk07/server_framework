@@ -4,7 +4,6 @@
 #include "boost/asio/detail/chrono.hpp"
 #include "boost/asio/io_context.hpp"
 #include "boost/asio/read.hpp"
-#include "boost/asio/registered_buffer.hpp"
 #include "boost/asio/ssl/context.hpp"
 #include "boost/asio/ssl/stream.hpp"
 #include "boost/asio/ssl/verify_mode.hpp"
@@ -20,67 +19,83 @@
 #include <string_view>
 #include <sys/socket.h>
 
-class Wss_client {
-    boost::asio::ssl::stream<boost::asio::ip::tcp::socket> &socket;
+class Wss_client : public std::enable_shared_from_this<Wss_client> {
+  std::shared_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>
+      socket;
 
 public:
-  Wss_client(boost::asio::ssl::stream<boost::asio::ip::tcp::socket> &soc)
+  Wss_client(
+      std::shared_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>
+          soc)
       : socket(soc) {};
 
-  void connect(){
+  void connect() {
+
+    auto self = shared_from_this();
 
     std::cout << "WSS testing" << std::endl;
-                    auto writebuf = std::make_shared<boost::asio::streambuf>();
-                    auto readbuf = std::make_shared<boost::asio::streambuf>();
-                    std::ostream os(writebuf.get());
+    auto writebuf = std::make_shared<boost::asio::streambuf>();
+    auto readbuf = std::make_shared<boost::asio::streambuf>();
+    std::ostream os(writebuf.get());
 
-                    // 1. WebSocket Upgrade Request
-                    os << "GET /test HTTP/1.1\r\n"
-                       << "Host: 127.0.0.1:8000\r\n"
-                       << "Upgrade: websocket\r\n"
-                       << "Connection: Upgrade\r\n"
-                       << "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
-                       << "Sec-WebSocket-Protocol: multiplex-v1\r\n"
-                       << "Sec-WebSocket-Version: 13\r\n\r\n";
+    // 1. WebSocket Upgrade Request
+    os << "GET /test HTTP/1.1\r\n"
+       << "Host: 127.0.0.1:8000\r\n"
+       << "Upgrade: websocket\r\n"
+       << "Connection: Upgrade\r\n"
+       << "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
+       << "Sec-WebSocket-Protocol: multiplex-v1\r\n"
+       << "Sec-WebSocket-Version: 13\r\n\r\n";
 
-                    boost::asio::async_write(
-                        socket, *writebuf,
-                        [&, readbuf, writebuf](
-                            const boost::system::error_code &ec, std::size_t) {
-                          if (ec)
-                            return;
+    boost::asio::async_write(
+        *socket, *writebuf,
+        [self, readbuf, writebuf](const boost::system::error_code &ec,
+                                  std::size_t) {
+          if (ec)
+            return;
 
-                          // 2. Wait for 101 Switching Protocols
-                          std::cout << "waiting switching protocols "
-                                       "confirmation from server .."
-                                    << std::endl;
-                          boost::asio::async_read_until(
-                              socket, *readbuf, "\r\n\r\n",
-                              [&, readbuf,
-                               writebuf](const boost::system::error_code &ec,
-                                         std::size_t bytes) {
-                                if (ec)
-                                  return;
+          // 2. Wait for 101 Switching Protocols
+          std::cout << "waiting switching protocols "
+                       "confirmation from server .."
+                    << std::endl;
+          boost::asio::async_read_until(
+              *(self->socket), *readbuf, "\r\n\r\n",
+              [self, readbuf, writebuf](const boost::system::error_code &ec,
+                                        std::size_t bytes) {
+                if (ec)
+                  return;
 
-                                std::string resp(
-                                    boost::asio::buffers_begin(readbuf->data()),
-                                    boost::asio::buffers_begin(
-                                        readbuf->data()) +
-                                        bytes);
-                                std::cout << "Handshake Response:\n"
-                                          << resp << std::endl;
+                std::string resp(boost::asio::buffers_begin(readbuf->data()),
+                                 boost::asio::buffers_begin(readbuf->data()) +
+                                     bytes);
+                std::cout << "Handshake Response:\n" << resp << std::endl;
 
-                                if (resp.find("101 Switching Protocols") !=
-                                    std::string::npos) {
-                                    auto timer = std::make_shared<boost::asio::steady_timer>(this->socket.get_executor(),boost::asio::chrono::seconds(45)); 
-                                    read_from_linfr(timer);
+                if (resp.find("101 Switching Protocols") != std::string::npos) {
+                  auto timer = std::make_shared<boost::asio::steady_timer>(
+                      self->socket->get_executor());
+                  timer->async_wait([timer](
+                                        const boost::system::error_code &ec) {
+                    if (!ec) {
+                      auto expiry_time = timer->expiry();
+                      auto count =
+                          std::chrono::duration_cast<std::chrono::seconds>(
+                              expiry_time.time_since_epoch())
+                              .count();
 
-                                }
-                              });
-                        });
+                      std::cout << "Ping was not recieved so we break "
+                                   "connection ...time_duration_passed:"
+                                << count << std::endl;
 
+                    } else {
+                      std::cout << "Timer cancelled or error: " << ec.message()
+                                << std::endl;
+                    }
+                  });
+                  self->read_from_linfr(timer);
+                }
+              });
+        });
   }
-
 
   struct wss_payload {
     int STREAM_ID;
@@ -127,90 +142,172 @@ public:
   };
 
   void send_message(std::shared_ptr<boost::asio::streambuf> write_buf) {
+    auto self = shared_from_this();
     boost::asio::async_write(
-        this->socket, *write_buf,
+        *(self->socket), *write_buf,
         [](const boost::system::error_code &ec, std::size_t bytes) {
           if (!ec) {
             std::cout << "Sent message ..." << std::endl;
           }
         });
   }
-void read_from_linfr(std::shared_ptr<boost::asio::steady_timer> timer) {
+  void read_from_linfr(std::shared_ptr<boost::asio::steady_timer> timer) {
+    auto self = shared_from_this();
     auto state = std::make_shared<ReadState>();
 
-    // Recursive lambda to process subsequent frames within the same message state
+    // Recursive lambda to process subsequent frames within the same message
+    // state
     auto read_next_frame = std::make_shared<std::function<void()>>();
-    if(timer->expiry() <= boost::asio::steady_timer::clock_type::now()){
-      std::cout << "Something is wrong with connection ig here .... " << std::endl;
-      return;
-    }
-    *read_next_frame = [this, state, timer, read_next_frame]() {
-        boost::asio::async_read(
-            socket, boost::asio::buffer(state->header, 2),
-            [this, state, timer, read_next_frame](const boost::system::error_code &ec, std::size_t) {
-                if (!ec) {
-                    // Reset timer: Extend deadline by 45s from current expiry
-                    timer->expires_at(timer->expiry() + boost::asio::chrono::seconds(45));
-                    
-                    wss_frame frame;
-                    frame.OPCODE = state->header[0] & 0x0F;
-                    frame.FIN = (state->header[0] >> 7) & 0x01;
+    *read_next_frame = [self, state, timer, read_next_frame]() {
+      boost::asio::async_read(
+          *(self->socket), boost::asio::buffer(state->header, 2),
+          [self, state, timer,
+           read_next_frame](const boost::system::error_code &ec, std::size_t) {
+            if (!ec) {
+              // Reset timer: Extend deadline by 45s from current expiry
+              timer->expires_at(timer->expiry() +
+                                boost::asio::chrono::seconds(45));
 
-                    auto ext_len_buf = std::make_shared<uint16_t>();
-                    boost::asio::async_read(
-                        socket, boost::asio::buffer(ext_len_buf.get(), 2),
-                        [this, frame, ext_len_buf, state, timer, read_next_frame](const boost::system::error_code &ec, std::size_t) mutable {
-                            if (ec) return;
-                            frame.EXTENDED_LENGTH = ntohs(*ext_len_buf);
+              wss_frame frame;
+              frame.OPCODE = state->header[0] & 0x0F;
+              frame.FIN = (state->header[0] >> 7) & 0x01;
+              frame.LENGTH = (state->header[1] & 0x7F);
+              if (frame.LENGTH != 125) {
+                auto ext_len_buf = std::make_shared<uint16_t>();
+                boost::asio::async_read(
+                    *(self->socket), boost::asio::buffer(ext_len_buf.get(), 2),
+                    [self, frame, ext_len_buf, state, timer,
+                     read_next_frame](const boost::system::error_code &ec,
+                                      std::size_t) mutable {
+                      if (ec)
+                        return;
+                      frame.EXTENDED_LENGTH = ntohs(*ext_len_buf);
 
-                            auto full_payload = std::make_shared<std::vector<uint8_t>>(frame.EXTENDED_LENGTH);
-                            boost::asio::async_read(
-                                socket, boost::asio::buffer(full_payload->data(), full_payload->size()),
-                                [this, frame, full_payload, state, timer, read_next_frame](const boost::system::error_code &ec, std::size_t) mutable {
-                                    if (ec) return;
+                      auto full_payload =
+                          std::make_shared<std::vector<uint8_t>>(
+                              frame.EXTENDED_LENGTH);
+                      boost::asio::async_read(
+                          *(self->socket),
+                          boost::asio::buffer(full_payload->data(),
+                                              full_payload->size()),
+                          [self, frame, full_payload, state, timer,
+                           read_next_frame](const boost::system::error_code &ec,
+                                            std::size_t) mutable {
+                            if (ec)
+                              return;
 
-                                    uint32_t net_sid;
-                                    std::memcpy(&net_sid, full_payload->data(), 4);
-                                    frame.py.STREAM_ID = ntohl(net_sid);
-                                    frame.py.payload.assign(reinterpret_cast<char *>(full_payload->data() + 4), full_payload->size() - 4);
+                            uint32_t net_sid;
+                            std::memcpy(&net_sid, full_payload->data(), 4);
+                            frame.py.STREAM_ID = ntohl(net_sid);
+                            frame.py.payload.assign(
+                                reinterpret_cast<char *>(full_payload->data() +
+                                                         4),
+                                full_payload->size() - 4);
 
-                                    state->current_message_frames.push_back(std::move(frame));
+                            state->current_message_frames.push_back(
+                                std::move(frame));
 
-                                    // Handle Ping (Opcode 0x09)
-                                    if (state->current_message_frames.back().OPCODE == 0x09) {
-                                        auto write_buff = std::make_shared<boost::asio::streambuf>();
-                                        std::ostream os(write_buff.get());
-                                        create_frame("", 1234, 1, 0x0A, os); // Send Pong
-                                        this->send_message(write_buff);
-                                    }
+                            // Handle Ping (Opcode 0x09)
+                            if (state->current_message_frames.back().OPCODE ==
+                                0x09) {
+                              timer->expires_at(
+                                  timer->expiry() +
+                                  boost::asio::chrono::seconds(45));
+                              auto write_buff =
+                                  std::make_shared<boost::asio::streambuf>();
+                              std::ostream os(write_buff.get());
 
-                                    // Check if message is complete
-                                    if (state->current_message_frames.back().FIN == 1) {
-                                        std::string final_msg;
-                                        for (auto &f : state->current_message_frames) {
-                                            final_msg += f.py.payload;
-                                        }
-                                        std::cout << "Message complete: " << final_msg << std::endl;
-                                        
-                                        // Start fresh with a new state for the next message
-                                        this->read_from_linfr(timer);
-                                    } else {
-                                        // Recursively read the next frame using the SAME state
-                                        (*read_next_frame)();
-                                    }
-                                });
-                        });
-                } else if (ec != boost::asio::error::operation_aborted) {
-                    std::cerr << "Read error: " << ec.message() << std::endl;
-                }
-            });
+                              self->create_frame("", 1234, 1, 0x0A,
+                                                 os); // Send Pong
+                              self->send_message(write_buff);
+                            }
+
+                            // Check if message is complete
+                            if (state->current_message_frames.back().FIN == 1) {
+                              std::string final_msg;
+                              for (auto &f : state->current_message_frames) {
+                                final_msg += f.py.payload;
+                              }
+                              std::cout << "Message complete: " << final_msg
+                                        << std::endl;
+
+                              // Start fresh with a new state for the next
+                              // message
+                              self->read_from_linfr(timer);
+                            } else {
+                              // Recursively read the next frame using the SAME
+                              // state
+                              (*read_next_frame)();
+                            }
+                          });
+                    });
+              } else {
+
+                frame.EXTENDED_LENGTH = ntohs(0);
+
+                auto full_payload =
+                    std::make_shared<std::vector<uint8_t>>(frame.LENGTH);
+                boost::asio::async_read(
+                    *(self->socket),
+                    boost::asio::buffer(full_payload->data(),
+                                        full_payload->size()),
+                    [self, frame, full_payload, state, timer,
+                     read_next_frame](const boost::system::error_code &ec,
+                                      std::size_t) mutable {
+                      if (ec)
+                        return;
+
+                      uint32_t net_sid;
+                      std::memcpy(&net_sid, full_payload->data(), 4);
+                      frame.py.STREAM_ID = ntohl(net_sid);
+                      frame.py.payload.assign(
+                          reinterpret_cast<char *>(full_payload->data() + 4),
+                          full_payload->size() - 4);
+
+                      state->current_message_frames.push_back(std::move(frame));
+
+                      // Handle Ping (Opcode 0x09)
+                      if (state->current_message_frames.back().OPCODE == 0x09) {
+                        timer->expires_at(timer->expiry() +
+                                          boost::asio::chrono::seconds(45));
+                        auto write_buff =
+                            std::make_shared<boost::asio::streambuf>();
+                        std::ostream os(write_buff.get());
+
+                        self->create_frame("", 1234, 1, 0x0A,
+                                           os); // Send Pong
+                        self->send_message(write_buff);
+                      }
+
+                      // Check if message is complete
+                      if (state->current_message_frames.back().FIN == 1) {
+                        std::string final_msg;
+                        for (auto &f : state->current_message_frames) {
+                          final_msg += f.py.payload;
+                        }
+                        std::cout << "Message complete: " << final_msg
+                                  << std::endl;
+
+                        // Start fresh with a new state for the next
+                        // message
+                        self->read_from_linfr(timer);
+                      } else {
+                        // Recursively read the next frame using the SAME
+                        // state
+                        (*read_next_frame)();
+                      }
+                    });
+              }
+            } else if (ec != boost::asio::error::operation_aborted) {
+              std::cerr << "Read error: " << ec.message() << std::endl;
+            }
+          });
     };
 
     // Kick off the first read
-    boost::asio::post(socket.get_executor(), [read_next_frame]() {
-        (*read_next_frame)();
-    });
-}
+    boost::asio::post(socket->get_executor(),
+                      [read_next_frame]() { (*read_next_frame)(); });
+  }
 
   void send_wss_binary_frames() {
     auto writebuf = std::make_shared<boost::asio::streambuf>();
@@ -250,25 +347,25 @@ void read_from_linfr(std::shared_ptr<boost::asio::steady_timer> timer) {
   };
 };
 
-
 int main(int argc, char *argv[]) {
   boost::asio::io_context io_context;
-  boost::asio::ssl::context cl(boost::asio::ssl::context::tlsv12_client);
-  cl.set_verify_mode(boost::asio::ssl::verify_none);
+  auto cl = std::make_shared<boost::asio::ssl::context>(
+      boost::asio::ssl::context::tlsv12_client);
+  cl->set_verify_mode(boost::asio::ssl::verify_none);
 
-  boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket(io_context, cl);
+  boost::asio::ssl::stream<boost::asio::ip::tcp::socket> socket(io_context,
+                                                                *cl);
 
   boost::asio::ip::tcp::resolver resolver(io_context);
   auto endpoint = resolver.resolve("127.0.0.1", "8000");
 
   boost::asio::async_connect(
       socket.lowest_layer(), endpoint,
-      [&socket, argv](const boost::system::error_code &err,
-                      const auto &endpoints) {
+      [&](const boost::system::error_code &err, const auto &endpoints) {
         if (!err) {
           socket.async_handshake(
               boost::asio::ssl::stream_base::client,
-              [&socket, argv](const boost::system::error_code &ec) {
+              [&socket, argv, cl](const boost::system::error_code &ec) {
                 if (!ec) {
                   std::cout << "tls handshake ... complete" << std::endl;
                   std::string_view cmd = argv[1];
@@ -287,9 +384,9 @@ int main(int argc, char *argv[]) {
                     iss << http_getrequest;
                     boost::asio::async_write(
                         socket, writebuf,
-                        [&socket, &reader,
-                         &writebuf](const boost::system::error_code &ec,
-                                    std::size_t bytes) {
+                        [&socket, &reader, &writebuf,
+                         cl](const boost::system::error_code &ec,
+                             std::size_t bytes) {
                           if (!ec) {
                             std::cout << "written succesfully" << std::endl;
 
@@ -346,9 +443,8 @@ int main(int argc, char *argv[]) {
                     iss << large_chunked_request;
                     boost::asio::async_write(
                         socket, *writebuf,
-                        [&socket, reader,
-                         writebuf](const boost::system::error_code &ec,
-                                   std::size_t bytes) {
+                        [&](const boost::system::error_code &ec,
+                            std::size_t bytes) {
                           if (!ec) {
                             std::cout << "TE written succesfully" << std::endl;
 
@@ -368,9 +464,28 @@ int main(int argc, char *argv[]) {
                           }
                         });
                   } else if (cmd == "wss") {
-                     auto wss_client = Wss_client(socket);
-                     wss_client.connect();
-                     wss_client.send_wss_binary_frames();
+                    auto wss_socket = std::make_shared<
+                        boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>(
+                        std::move(socket));
+                    auto wss_client = std::make_shared<Wss_client>(wss_socket);
+                    wss_client
+                        ->connect(); // logging  a simple idea of hsared_ptr
+                                     // which i keep forgetting , here if wss
+                                     // client is not inheriting the std ptr
+                                     // class this break when we invoke the
+                                     // connect , because here wss_client is
+                                     // shared_ptr so wss_client with invoke
+                                     // connect , ... etc , move forward due
+                                     // async nature and starts to remove stuff
+                                     // stack/heap , so wss client goes missing
+                                     // , when our connect func executes after a
+                                     // while we captured 'this' which is a
+                                     // simple pointer to a shared_ptr which is
+                                     // over , boom , breaks .... , here we need
+                                     // to pass share_ptr into wss-client to
+                                     // tell that this variable is required ,
+                                     // fixxed
+                    wss_client->send_wss_binary_frames();
                   }
                 }
 
