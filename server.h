@@ -4,6 +4,7 @@
 #include "boost/asio/steady_timer.hpp"
 #include "boost/asio/write.hpp"
 #include "boost/system/detail/error_code.hpp"
+#include <algorithm>
 #include <boost/asio.hpp>
 #include <boost/asio/completion_condition.hpp>
 #include <boost/asio/detail/std_fenced_block.hpp>
@@ -735,7 +736,8 @@ protected:
 
             {PHASE::WSS, [this](std::shared_ptr<Response>, auto next) {
                struct wss_payload {
-                 int STREAM_ID;
+                 int STREAM_ID; // 32bit
+                 int FRAME_ID;  // 32bit
                  std::string payload;
                };
                struct wss_frame {
@@ -752,10 +754,15 @@ protected:
                  struct wss_payload py;
                };
 
-               auto create_frame = std::make_shared<
-                   std::function<std::vector<wss_frame>(std::string, int)>>();
+               auto message_counter_server = std::make_shared<int>();
+               *message_counter_server=0;
 
-               *create_frame = [](std::string msg, int streamid) {
+
+               auto create_frame =
+                   std::make_shared<std::function<std::vector<wss_frame>(
+                       std::string, int, int)>>();
+
+               *create_frame = [](std::string msg, int streamid, int frame_id) {
                  std::vector<wss_frame> res_frames;
                  int string_size = msg.size();
                  int offset = 0;
@@ -769,17 +776,16 @@ protected:
                                               // we add the stream int 32 bit 4
                                               // bytes to existing 125 bytes ...
                                               // we need to use length code 126
-                   size_t total_payload_size = 4 + payload_chunk_size;
+                   size_t total_payload_size = 8 + payload_chunk_size;
                    struct wss_frame frame;
                    frame.FIN =
                        (offset + payload_chunk_size >= string_size) ? 1 : 0;
 
                    frame.OPCODE = (offset == 0) ? 2 : 0;
                    frame.MASK = 0;
-                   frame.LENGTH = 126;
-                   frame.EXTENDED_LENGTH = 125 + 4; // bytes (payload+streamid)
                    frame.py.payload = msg.substr(offset, payload_chunk_size);
                    frame.py.STREAM_ID = streamid;
+                   frame.py.FRAME_ID = frame_id;
                    if (total_payload_size <= 125) {
                      frame.LENGTH = static_cast<uint8_t>(total_payload_size);
                      frame.EXTENDED_LENGTH = 0;
@@ -805,16 +811,19 @@ protected:
                    std::shared_ptr<std::deque<std::vector<wss_frame>>>)>>();
 
                *write_frame =
-                   [this, write_frame](
+                   [this, write_frame, message_counter_server](
                        std::shared_ptr<std::deque<std::vector<wss_frame>>> DQ) {
                      while (!DQ->empty()) {
                        std::cout << "Started writing wss frame here ..."
                                  << std::endl;
                        auto vec_msgs = DQ->front();
-                       DQ->pop_front();
                        for (auto i = 0; i < vec_msgs.size(); i++) {
                          // boost async write here send each chunk acordingly
-
+                         (*message_counter_server)++; // increase count of
+                                                      // frame_id for reaply
+                                                      // handler if required
+                                                      // during read .
+                         vec_msgs[i].py.FRAME_ID = *(message_counter_server);
                          std::vector<uint8_t> wire_buffer;
                          // [FIN(1) | RSV1(1) | RSV2(1) | RSV3(1) | OPCODE(4)]
                          uint8_t byte0 = 0;
@@ -843,6 +852,12 @@ protected:
                              reinterpret_cast<uint8_t *>(&network_sid);
                          wire_buffer.insert(wire_buffer.end(), sid_bytes,
                                             sid_bytes + 4);
+
+                         uint32_t frame_id_sid = htonl(vec_msgs[i].py.FRAME_ID);
+                         uint8_t *frame_bytes =
+                             reinterpret_cast<uint8_t *>(&frame_id_sid);
+                         wire_buffer.insert(wire_buffer.end(), frame_bytes,
+                                            frame_bytes + 4);
 
                          const uint8_t *string_bytes =
                              reinterpret_cast<const uint8_t *>(
@@ -875,10 +890,10 @@ protected:
                              boost::asio::buffer(wire_buffer.data(),
                                                  wire_buffer.size()),
                              [DQ,
-                              write_frame](const boost::system::error_code &ec,
+                              write_frame , message_counter_server ](const boost::system::error_code &ec,
                                            size_t bytes) {
                                if (!ec) {
-                                 std::cout << "Chunk sent" << std::endl;
+                                 std::cout << "Chunk sent ... message server counter at:" << message_counter_server << std::endl;
                                }
                              });
                        }
@@ -889,11 +904,13 @@ protected:
                // reading frames and reconstruction ...
 
                auto send_ping = std::make_shared<std::function<void(
-                   std::shared_ptr<std::deque<std::vector<wss_frame>>>)>>();
+                   std::shared_ptr<std::deque<std::vector<wss_frame>>>,
+                   int)>>();
                *send_ping =
                    [create_frame, write_frame](
                        std::shared_ptr<std::deque<std::vector<wss_frame>>>
-                           Sender_DQ) {
+                           Sender_DQ,
+                       int frame_id) {
                      std::string msg = "";
                      std::cout << "h1" << std::endl;
 
@@ -902,12 +919,13 @@ protected:
                      ping_frame.FIN = 0x01;
                      ping_frame.OPCODE = 0x09;
                      ping_frame.MASK = 0;
-                     ping_frame.LENGTH = 4;
+                     ping_frame.LENGTH = 8;
                      ping_frame.EXTENDED_LENGTH = 0;
                      ping_frame.RSV1 = 0x00;
                      ping_frame.RSV2 = 0x00;
                      ping_frame.RSV3 = 0x00;
                      ping_frame.py.STREAM_ID = 0;
+                     ping_frame.py.FRAME_ID = frame_id;
                      ping_frame.py.payload = "";
                      ping_frames.push_back(ping_frame);
 
@@ -915,13 +933,101 @@ protected:
                      (*write_frame)(Sender_DQ);
                    };
 
+               auto replay_handler = std::make_shared<std::function<void(
+                   int last_seen_msg_id_remote_client,
+                   std::shared_ptr<std::deque<std::vector<wss_frame>>>)>>();
+               *replay_handler = [message_counter_server, write_frame,
+                                  this](int remote_client_last_id,
+                                        std::shared_ptr<
+                                            std::deque<std::vector<wss_frame>>>
+                                            sender_DQ) {
+                 if (remote_client_last_id <= (*message_counter_server)) {
+                   // async_send all of these values from r_cL -> m-cs
+                   std::vector<wss_frame> replay_vec;
+
+                   auto it = std::find_if(sender_DQ->begin(), sender_DQ->end(),
+                                       [&](const std::vector<wss_frame> batch) {
+                                         return batch.back().py.FRAME_ID >=
+                                                remote_client_last_id;
+                                       });
+                   for (auto i = it; i != sender_DQ->end(); i++) {
+                     for (const auto &j : *it) {
+                       if (j.py.FRAME_ID <= (*message_counter_server) &&
+                           j.OPCODE != 0x09) {
+                         replay_vec.push_back(j);
+                       }
+                     }
+                   }
+                   // TODO we need tor rewrite this part , copied the earlier
+                   // function but we refactor ...
+
+                   for (auto i = 0; i < replay_vec.size(); i++) {
+                     std::vector<uint8_t> wire_buffer;
+                     // [FIN(1) | RSV1(1) | RSV2(1) | RSV3(1) | OPCODE(4)]
+                     uint8_t byte0 = 0;
+                     byte0 |= (replay_vec[i].FIN & 0x01) << 7;
+                     byte0 |= (replay_vec[i].RSV1 & 0x01) << 6;
+                     byte0 |= (replay_vec[i].RSV2 & 0x01) << 5;
+                     byte0 |= (replay_vec[i].RSV3 & 0x01) << 4;
+                     byte0 |= (replay_vec[i].OPCODE & 0x0F);
+                     wire_buffer.push_back(byte0);
+
+                     uint8_t byte1 = 0;
+                     byte1 |= (replay_vec[i].MASK & 0x01) << 7;
+
+                     uint8_t byte01 = 0;
+                     byte01 |=
+                         (static_cast<uint8_t>(replay_vec[i].LENGTH) & 0x7F);
+                     wire_buffer.push_back(byte01);
+
+                     byte1 |=
+                         (static_cast<uint8_t>(replay_vec[i].EXTENDED_LENGTH) &
+                          0x7F);
+                     wire_buffer.push_back(byte1);
+
+                     uint32_t network_sid = htonl(replay_vec[i].py.STREAM_ID);
+                     uint8_t *sid_bytes =
+                         reinterpret_cast<uint8_t *>(&network_sid);
+                     wire_buffer.insert(wire_buffer.end(), sid_bytes,
+                                        sid_bytes + 4);
+
+                     uint32_t frame_id_sid = htonl(replay_vec[i].py.FRAME_ID);
+                     uint8_t *frame_bytes =
+                         reinterpret_cast<uint8_t *>(&frame_id_sid);
+                     wire_buffer.insert(wire_buffer.end(), frame_bytes,
+                                        frame_bytes + 4);
+
+                     const uint8_t *string_bytes =
+                         reinterpret_cast<const uint8_t *>(
+                             replay_vec[i].py.payload.data());
+                     wire_buffer.insert(wire_buffer.end(), string_bytes,
+                                        string_bytes +
+                                            replay_vec[i].py.payload.size());
+
+                     
+                     boost::asio::async_write(
+                         this->conn->conn_socket,
+                         boost::asio::buffer(wire_buffer.data(),
+                                             wire_buffer.size()),
+                         [frame_id_sid](const boost::system::error_code &ec, size_t bytes) {
+                           if (!ec) {
+                             std::cout
+                                 << "Chunk replayed here ... remember we do "
+                                    "not make a new ID for these replayed ids ... message_id:" << frame_id_sid
+                                 << std::endl;
+                           }
+                         });
+                   }
+                 }
+               };
                auto reader_from_line = std::make_shared<std::function<void(
                    std::shared_ptr<std::deque<std::vector<wss_frame>>>,
                    std::shared_ptr<std::deque<std::vector<wss_frame>>>,
                    std::function<void()>,
                    std::shared_ptr<boost::asio::steady_timer>)>>();
                *reader_from_line = ([this, write_frame, create_frame,
-                                     reader_from_line, send_ping](
+                                     reader_from_line, send_ping,
+                                     message_counter_server , replay_handler](
                                         std::shared_ptr<
                                             std::deque<std::vector<wss_frame>>>
                                             sender_DQ,
@@ -946,24 +1052,33 @@ protected:
                  boost::asio::post(
                      this->conn->conn_socket.get_executor(),
                      [this, DQ, reader_from_line, next, state, timer, send_ping,
-                      sender_DQ]() {
+                      sender_DQ, message_counter_server , replay_handler]() {
                        auto read_next_frame =
                            std::make_shared<std::function<void()>>();
                        *read_next_frame = [this, DQ, read_next_frame,
                                            reader_from_line, next, state, timer,
-                                           send_ping, sender_DQ]() {
+                                           send_ping, sender_DQ,
+                                           message_counter_server , replay_handler]() {
                          boost::asio::async_read(
                              this->conn->conn_socket,
                              boost::asio::buffer(state->header, 2),
                              [this, state, DQ, read_next_frame,
                               reader_from_line, next, timer, send_ping,
-                              sender_DQ](boost::system::error_code ec, size_t) {
+                              sender_DQ, message_counter_server , replay_handler](
+                                 boost::system::error_code ec, size_t) {
                                if (ec) {
                                  std::cout << "error_code" << ec.message()
                                            << std::endl;
                                  return;
                                }
-
+                               (*message_counter_server)++; // increment for
+                                                            // every time i have
+                                                            // read the message
+                                                            // for updation of
+                                                            // message if , for
+                                                            // consistent
+                                                            // checking for
+                                                            // replay
                                std::cout << "Started reading funk body"
                                          << std::endl;
                                wss_frame frame;
@@ -982,9 +1097,10 @@ protected:
                                      boost::asio::buffer(ext_len_buf.get(), 2),
                                      [this, state, DQ, frame, ext_len_buf,
                                       read_next_frame, reader_from_line, next,
-                                      timer, send_ping,
-                                      sender_DQ](boost::system::error_code ec,
-                                                 size_t) mutable {
+                                      timer, send_ping, sender_DQ,
+                                      message_counter_server , replay_handler](
+                                         boost::system::error_code ec,
+                                         size_t) mutable {
                                        if (ec)
                                          return;
 
@@ -1002,7 +1118,8 @@ protected:
                                            [this, state, DQ, frame,
                                             full_payload, read_next_frame,
                                             reader_from_line, next, timer,
-                                            send_ping, sender_DQ](
+                                            send_ping, sender_DQ,
+                                            message_counter_server , replay_handler](
                                                boost::system::error_code ec,
                                                size_t) mutable {
                                              if (ec)
@@ -1017,11 +1134,20 @@ protected:
                                              frame.py.STREAM_ID =
                                                  ntohl(net_sid);
 
+                                             // Extract frame_id
+                                             uint32_t frame_id_sid;
+                                             std::memcpy(
+                                                 &frame_id_sid,
+                                                 full_payload->data() + 4, 4);
+
+                                             frame.py.FRAME_ID =
+                                                 ntohl(frame_id_sid);
+
                                              // Extract Data
                                              frame.py.payload.assign(
                                                  reinterpret_cast<char *>(
-                                                     full_payload->data() + 4),
-                                                 full_payload->size() - 4);
+                                                     full_payload->data() + 8),
+                                                 full_payload->size() - 8);
 
                                              state->current_message_frames
                                                  .push_back(std::move(frame));
@@ -1037,24 +1163,146 @@ protected:
                                                if (timer->expiry() <=
                                                    boost::asio::steady_timer::
                                                        clock_type::now()) {
-                                                 std::cout
-                                                     << "Breaking connection "
-                                                        "as client has not "
-                                                        "responded in time .. "
-                                                     << std::endl;
-                                                 state->current_message_frames
-                                                     .clear();
-                                                 // moving to next in global
-                                                 // chain , here we are breaking
-                                                 // the connection of wss
-                                                 // entirely
-                                                 next();
+                                                 // TODO here we wait for a
+                                                 // while and call handler
+                                                 // replay which compares last
+                                                 // send and starts replaying of
+                                                 // missed messages and moving
+                                                 // forward to next() if we
+                                                 // broke the connection
+                                                 // entirely and then we need to
+                                                 // start session handling where
+                                                 // we cache the entire session
+                                                 // etadat current message
+                                                 // stream we have , so both
+                                                 // sender DQ,DQ , if we get a
+                                                 // pong in time we can just
+                                                 // replay messages over the
+                                                 // connection and it will easy
+                                                 // , use next() only when
+                                                 // breaking the connection
+                                                 // entirely .
+                                                 auto timer_waiting_for_pong =
+                                                     std::make_shared<
+                                                         boost::asio::
+                                                             steady_timer>(
+                                                         this->conn->conn_socket
+                                                             .get_executor());
+                                                 auto buffer = std::make_shared<
+                                                     boost::asio::streambuf>();
+                                                 timer->expires_after(
+                                                     std::chrono::seconds(5));
+                                                 timer->async_wait(
+                                                     [state , next](
+                                                         const boost::system::
+                                                             error_code &ec) {
+                                                       if (!ec) {
+                                                         // TIMER EXPIRED - The
+                                                         // read was too slow
+                                                         std::cout
+                                                             << "Timeout! "
+                                                                "Ending wss connection moving to global next .."
+                                                                "...\n";
+                                                         state->current_message_frames.clear();
+                                                             next();
+                                                       }
+                                                     });
+                                                 // read for new pong payload ...
+                             
+                            struct ReadState {
+                                std::vector<wss_frame> current_message_frames;
+                                 uint8_t header[2];
+                              };
+                            auto state_replay = std::make_shared<ReadState>();
+
+                            boost::asio::async_read(
+                             this->conn->conn_socket,
+                             boost::asio::buffer(state->header, 2),
+                             [this, state_replay, DQ, read_next_frame,
+                              reader_from_line, next, timer, send_ping,
+                              sender_DQ, message_counter_server , replay_handler , timer_waiting_for_pong](
+                                 boost::system::error_code ec, size_t) {
+                               if (ec) {
+                                 std::cout << "error_code" << ec.message()
+                                           << std::endl;
+                                 return;
+                               }
+                               timer_waiting_for_pong->cancel(); // cancell on going timer ...
+                               std::cout << "Started Replay pong body reading"
+                                         << std::endl;
+                               wss_frame frame;
+                               frame.FIN = (state_replay->header[0] >> 7) & 0x01;
+                               frame.OPCODE = state_replay->header[0] & 0x0F;
+                               std::cout << frame.OPCODE << std::endl;
+
+                               frame.LENGTH = state_replay->header[1] & 0x7F;
+
+                                                                             
+                                frame.EXTENDED_LENGTH = ntohs(0);
+
+                                 auto full_payload =
+                                     std::make_shared<std::vector<uint8_t>>(
+                                         frame.LENGTH);
+                                 boost::asio::async_read(
+                                     this->conn->conn_socket,
+                                     boost::asio::buffer(full_payload->data(),
+                                                         full_payload->size()),
+                                     [this, state_replay, DQ, frame, full_payload,
+                                      read_next_frame, reader_from_line, next,
+                                      timer, send_ping, sender_DQ,
+                                      message_counter_server , replay_handler](
+                                         boost::system::error_code ec,
+                                         size_t) mutable {
+                                       if (ec)
+                                         return;
+                                       std::cout << "Reading Replay state pong payload"
+                                                 << std::endl;
+                                       // Extract StreamID
+                                       uint32_t net_sid;
+                                       std::memcpy(&net_sid,
+                                                   full_payload->data(), 4);
+                                       frame.py.STREAM_ID = ntohl(net_sid);
+                                       // Extract frame_id
+                                       uint32_t frame_id_sid;
+                                       std::memcpy(&frame_id_sid,
+                                                   full_payload->data() + 4, 4);
+                                       // Extract Data
+                                       frame.py.payload.assign(
+                                           reinterpret_cast<char *>(
+                                               full_payload->data() + 8),
+                                           full_payload->size() - 8);
+
+                                       
+                                       bool pong_message =
+                                           (state_replay->current_message_frames.back()
+                                                .OPCODE ==
+                                            static_cast<uint8_t>(11));
+                                                
+                                               // replay function logic here , insert the message id of pong
+                                                (*replay_handler)(frame.py.FRAME_ID-1,sender_DQ);
+                                                (*reader_from_line)(sender_DQ,DQ,next,timer);
+
+                                            });
+
+
+                                        }); 
 
                                                } else {
-                                                 (*send_ping)(sender_DQ);
+                                                 (*send_ping)(
+                                                     sender_DQ,
+                                                     *message_counter_server);
                                                  timer->expires_after(
                                                      boost::asio::chrono::
                                                          seconds(45));
+                                                 try{
+                                                   auto index = std::find_if(sender_DQ->begin(),sender_DQ->end(),[&](const std::vector<wss_frame> batch){
+                                                        return batch.back().py.FRAME_ID <= frame.py.FRAME_ID;
+                                                     });
+                                                 auto index_int = index - sender_DQ->begin();
+                                                 sender_DQ->erase(sender_DQ->begin(), sender_DQ->begin() + index_int);
+                                                 }catch(const std::error_code& er){
+                                                   std::cout << "Error in clearing the sender dq on pong" << std::endl; 
+                                                 }
                                                }
                                              }
 
@@ -1144,9 +1392,10 @@ protected:
                                                          full_payload->size()),
                                      [this, state, DQ, frame, full_payload,
                                       read_next_frame, reader_from_line, next,
-                                      timer, send_ping,
-                                      sender_DQ](boost::system::error_code ec,
-                                                 size_t) mutable {
+                                      timer, send_ping, sender_DQ,
+                                      message_counter_server , replay_handler](
+                                         boost::system::error_code ec,
+                                         size_t) mutable {
                                        if (ec)
                                          return;
                                        std::cout << "Reading payload"
@@ -1156,12 +1405,15 @@ protected:
                                        std::memcpy(&net_sid,
                                                    full_payload->data(), 4);
                                        frame.py.STREAM_ID = ntohl(net_sid);
-
+                                       // Extract frame_id
+                                       uint32_t frame_id_sid;
+                                       std::memcpy(&frame_id_sid,
+                                                   full_payload->data() + 4, 4);
                                        // Extract Data
                                        frame.py.payload.assign(
                                            reinterpret_cast<char *>(
-                                               full_payload->data() + 4),
-                                           full_payload->size() - 4);
+                                               full_payload->data() + 8),
+                                           full_payload->size() - 8);
 
                                        state->current_message_frames.push_back(
                                            std::move(frame));
@@ -1176,23 +1428,131 @@ protected:
                                          if (timer->expiry() <=
                                              boost::asio::steady_timer::
                                                  clock_type::now()) {
-                                           std::cout << "Breaking connection "
-                                                        "as client has not "
-                                                        "responded in time .. "
-                                                     << std::endl;
-                                           state->current_message_frames
-                                               .clear();
-                                           // moving to next in global
-                                           // chain , here we are breaking
-                                           // the connection of wss
-                                           // entirely
-                                           next();
+                                           // Refer to above TODO for replay
+                                           // mangement .
+                                           //
+                                                     auto timer_waiting_for_pong =
+                                                     std::make_shared<
+                                                         boost::asio::
+                                                             steady_timer>(
+                                                         this->conn->conn_socket
+                                                             .get_executor());
+                                                 auto buffer = std::make_shared<
+                                                     boost::asio::streambuf>();
+                                                 timer->expires_after(
+                                                     std::chrono::seconds(5));
+                                                 timer->async_wait(
+                                                     [state , next](
+                                                         const boost::system::
+                                                             error_code &ec) {
+                                                       if (!ec) {
+                                                         // TIMER EXPIRED - The
+                                                         // read was too slow
+                                                         std::cout
+                                                             << "Timeout! "
+                                                                "Ending wss connection moving to global next .."
+                                                                "...\n";
+                                                         state->current_message_frames.clear();
+                                                             next();
+                                                       }
+                                                     });
+                                                 // read for new pong payload ...
+                             
+                            struct ReadState {
+                                std::vector<wss_frame> current_message_frames;
+                                 uint8_t header[2];
+                              };
+                            auto state_replay = std::make_shared<ReadState>();
+
+                            boost::asio::async_read(
+                             this->conn->conn_socket,
+                             boost::asio::buffer(state->header, 2),
+                             [this, state_replay, DQ, read_next_frame,
+                              reader_from_line, next, timer, send_ping,
+                              sender_DQ, message_counter_server , replay_handler , timer_waiting_for_pong](
+                                 boost::system::error_code ec, size_t) {
+                               if (ec) {
+                                 std::cout << "error_code" << ec.message()
+                                           << std::endl;
+                                 return;
+                               }
+                               timer_waiting_for_pong->cancel(); // cancell on going timer ...
+                               std::cout << "Started Replay pong body reading"
+                                         << std::endl;
+                               wss_frame frame;
+                               frame.FIN = (state_replay->header[0] >> 7) & 0x01;
+                               frame.OPCODE = state_replay->header[0] & 0x0F;
+                               std::cout << frame.OPCODE << std::endl;
+
+                               frame.LENGTH = state_replay->header[1] & 0x7F;
+
+                                                                             
+                                frame.EXTENDED_LENGTH = ntohs(0);
+
+                                 auto full_payload =
+                                     std::make_shared<std::vector<uint8_t>>(
+                                         frame.LENGTH);
+                                 boost::asio::async_read(
+                                     this->conn->conn_socket,
+                                     boost::asio::buffer(full_payload->data(),
+                                                         full_payload->size()),
+                                     [this, state_replay, DQ, frame, full_payload,
+                                      read_next_frame, reader_from_line, next,
+                                      timer, send_ping, sender_DQ,
+                                      message_counter_server , replay_handler](
+                                         boost::system::error_code ec,
+                                         size_t) mutable {
+                                       if (ec)
+                                         return;
+                                       std::cout << "Reading Replay state pong payload"
+                                                 << std::endl;
+                                       // Extract StreamID
+                                       uint32_t net_sid;
+                                       std::memcpy(&net_sid,
+                                                   full_payload->data(), 4);
+                                       frame.py.STREAM_ID = ntohl(net_sid);
+                                       // Extract frame_id
+                                       uint32_t frame_id_sid;
+                                       std::memcpy(&frame_id_sid,
+                                                   full_payload->data() + 4, 4);
+                                       // Extract Data
+                                       frame.py.payload.assign(
+                                           reinterpret_cast<char *>(
+                                               full_payload->data() + 8),
+                                           full_payload->size() - 8);
+
+                                       
+                                       bool pong_message =
+                                           (state_replay->current_message_frames.back()
+                                                .OPCODE ==
+                                            static_cast<uint8_t>(11));
+                                                
+                                               // replay function logic here , insert the message id of pong
+                                                (*replay_handler)(frame.py.FRAME_ID-1,sender_DQ);
+                                                (*reader_from_line)(sender_DQ,DQ,next,timer);
+
+                                            });
+
+
+                                        });
 
                                          } else {
-                                           (*send_ping)(sender_DQ);
+                                           (*send_ping)(
+                                               sender_DQ,
+                                               *message_counter_server);
                                            timer->expires_after(
                                                boost::asio::chrono::seconds(
                                                    45));
+                                           try{
+                                                   auto index = std::find_if(sender_DQ->begin(),sender_DQ->end(),[&](const std::vector<wss_frame> batch){
+                                                        return batch.back().py.FRAME_ID <= frame.py.FRAME_ID;
+                                                     });
+                                                 auto index_int = index - sender_DQ->begin();
+                                                 sender_DQ->erase(sender_DQ->begin(), sender_DQ->begin() + index_int);
+                                                 }catch(const std::error_code& er){
+                                                   std::cout << "Error in clearing the sender dq on pong" << std::endl; 
+                                                 }
+
                                          }
                                        }
 
@@ -1252,6 +1612,9 @@ protected:
                                                         "procedure after wss "
                                                         "completion"
                                                      << std::endl;
+                                           // TODO : send final frame and
+                                           // cleanup all frames which are
+                                           // present here
                                            next();
                                          }
 
@@ -1269,8 +1632,9 @@ protected:
                    ws_handler;
                ws_handler = std::make_shared<std::function<void(
                    std::function<void()>)>>([this, write_frame, create_frame,
-                                             reader_from_line,
-                                             send_ping](auto next) {
+                                             reader_from_line, send_ping,
+                                             message_counter_server](
+                                                auto next) {
                  std::shared_ptr<std::deque<std::vector<wss_frame>>>
                      Write_queue =
                          std::make_shared<std::deque<std::vector<wss_frame>>>();
@@ -1282,17 +1646,19 @@ protected:
 
                  timer->expires_after(boost::asio::chrono::seconds(45));
 
-                 timer->async_wait([timer,next](
-                                       const boost::system::error_code &ec) {
-                   if (!ec) {                     auto expiry_time = timer->expiry();
+                 timer->async_wait([timer,
+                                    next](const boost::system::error_code &ec) {
+                   if (!ec) {
+                     auto expiry_time = timer->expiry();
                      auto count =
                          std::chrono::duration_cast<std::chrono::seconds>(
                              expiry_time.time_since_epoch())
                              .count();
 
-                     std::cout << "Pong was not recieved so we break connection ...time_duration_passed:" << count
-                               << std::endl;
-                      next();
+                     std::cout << "Pong was not recieved so we break "
+                                  "connection ...time_duration_passed:"
+                               << count << std::endl;
+                     next();
 
                    } else {
                      std::cout << "Timer cancelled or error: " << ec.message()
@@ -1308,10 +1674,10 @@ protected:
                  // other db,or calcualtion do
                  // you for your client , we will
                  // use a handler in place here
-                 (*send_ping)(Write_queue);
+                 (*send_ping)(Write_queue, *message_counter_server);
                  std::cout << "PING intiated" << std::endl;
 
-                 auto msg_frams = (*create_frame)(message, 1);
+                 auto msg_frams = (*create_frame)(message, 1, 1);
                  Write_queue->push_back(msg_frams);
                  (*write_frame)(Write_queue);
                  // ...

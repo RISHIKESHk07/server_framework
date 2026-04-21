@@ -13,6 +13,7 @@
 #include <boost/asio.hpp>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <iostream>
 #include <memory>
 #include <ostream>
@@ -22,6 +23,31 @@
 class Wss_client : public std::enable_shared_from_this<Wss_client> {
   std::shared_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>
       socket;
+  std::shared_ptr<int> message_counter_client;
+  struct wss_payload {
+    int STREAM_ID;
+    int FRAME_ID;
+    std::string payload;
+  };
+  struct wss_frame {
+    int FIN;  // 1bit
+    int RSV1; // 1 bit
+    int RSV2;
+    int RSV3;
+    int OPCODE;          // 4 bits
+    int MASK;            // 1 bit
+    int LENGTH;          // 7 bits divide into 125 chunks remaining 126 ,127
+                         // for extended version frame length
+    int EXTENDED_LENGTH; // 16 unsigned bit integer as frame length
+                         // ...
+    struct wss_payload py;
+  };
+  struct ReadState {
+    std::vector<wss_frame> current_message_frames;
+    uint8_t header[2];
+  };
+
+  std::shared_ptr<std::deque<wss_frame>> Sender_DQ;
 
 public:
   Wss_client(
@@ -97,47 +123,35 @@ public:
         });
   }
 
-  struct wss_payload {
-    int STREAM_ID;
-    std::string payload;
-  };
-  struct wss_frame {
-    int FIN;  // 1bit
-    int RSV1; // 1 bit
-    int RSV2;
-    int RSV3;
-    int OPCODE;          // 4 bits
-    int MASK;            // 1 bit
-    int LENGTH;          // 7 bits divide into 125 chunks remaining 126 ,127
-                         // for extended version frame length
-    int EXTENDED_LENGTH; // 16 unsigned bit integer as frame length
-                         // ...
-    struct wss_payload py;
-  };
-  struct ReadState {
-    std::vector<wss_frame> current_message_frames;
-    uint8_t header[2];
-  };
-
   void create_frame(std::string_view data, uint32_t stream_id, bool fin,
                     uint8_t opcode, std::ostream &os) {
+    *(this->message_counter_client) = *(this->message_counter_client) + 1;
     // Byte 0: FIN | RSV | Opcode (0x02 for binary)
-    uint8_t byte0 = (fin ? 0x80 : 0x00) | opcode & 0x02;
+    uint8_t byte0 = (fin ? 0x80 : 0x00) | opcode & 0x0F;
     os.put(static_cast<char>(byte0));
 
-    // Byte 1: Mask(0) | Length(126 for 16-bit extended)
-    os.put(static_cast<char>(126));
+    if (data.size() + 8 <= 125) {
+      os.put(static_cast<char>(0x80 | (data.size() + 8)));
 
-    // Extended Length: payload size + 4 bytes for StreamID
-    uint16_t ext_len = htons(static_cast<uint16_t>(data.size() + 4));
-    os.write(reinterpret_cast<const char *>(&ext_len), 2);
+    } else if (data.size() + 8 <= 65536) {
+      os.put(static_cast<char>(0x80 | 126));
+      uint16_t ext_len = htons(static_cast<uint16_t>(data.size() + 8));
+      os.write(reinterpret_cast<const char *>(&ext_len), 2);
+
+    } else {
+      os.put(static_cast<char>(126));
+      uint16_t ext_len = htons(static_cast<uint16_t>(65536));
+      os.write(reinterpret_cast<const char *>(&ext_len), 2);
+    }
 
     // Stream ID (4 bytes)
     uint32_t net_sid = htonl(stream_id);
     os.write(reinterpret_cast<const char *>(&net_sid), 4);
+    // Frame ID (4 bytes)
+    uint32_t frame_id_sid = htonl(*(this->message_counter_client));
+    os.write(reinterpret_cast<const char *>(&frame_id_sid), 4);
 
     // Payload
-    std::cout << byte0 << "--" << ext_len << std::endl;
     os.write(data.data(), data.size());
   };
 
@@ -145,9 +159,9 @@ public:
     auto self = shared_from_this();
     boost::asio::async_write(
         *(self->socket), *write_buf,
-        [](const boost::system::error_code &ec, std::size_t bytes) {
+        [self](const boost::system::error_code &ec, std::size_t bytes) {
           if (!ec) {
-            std::cout << "Sent message ..." << std::endl;
+            std::cout << "Sent message ... Message_counter at:" << self->message_counter_client << std::endl;
           }
         });
   }
@@ -164,10 +178,6 @@ public:
           [self, state, timer,
            read_next_frame](const boost::system::error_code &ec, std::size_t) {
             if (!ec) {
-              // Reset timer: Extend deadline by 45s from current expiry
-              timer->expires_at(timer->expiry() +
-                                boost::asio::chrono::seconds(45));
-
               wss_frame frame;
               frame.OPCODE = state->header[0] & 0x0F;
               frame.FIN = (state->header[0] >> 7) & 0x01;
@@ -181,6 +191,7 @@ public:
                                       std::size_t) mutable {
                       if (ec)
                         return;
+                      (*(self->message_counter_client))++;
                       frame.EXTENDED_LENGTH = ntohs(*ext_len_buf);
 
                       auto full_payload =
@@ -198,11 +209,15 @@ public:
 
                             uint32_t net_sid;
                             std::memcpy(&net_sid, full_payload->data(), 4);
+                            uint32_t frame_id_sid;
+                            std::memcpy(&frame_id_sid, full_payload->data() + 4,
+                                        4);
                             frame.py.STREAM_ID = ntohl(net_sid);
+                            frame.py.FRAME_ID = ntohl(frame_id_sid);
                             frame.py.payload.assign(
                                 reinterpret_cast<char *>(full_payload->data() +
-                                                         4),
-                                full_payload->size() - 4);
+                                                         8),
+                                full_payload->size() - 8);
 
                             state->current_message_frames.push_back(
                                 std::move(frame));
@@ -259,10 +274,13 @@ public:
 
                       uint32_t net_sid;
                       std::memcpy(&net_sid, full_payload->data(), 4);
+                      uint32_t frame_id_sid;
+                      std::memcpy(&frame_id_sid, full_payload->data() + 4, 4);
                       frame.py.STREAM_ID = ntohl(net_sid);
+                      frame.py.FRAME_ID = ntohl(frame_id_sid);
                       frame.py.payload.assign(
-                          reinterpret_cast<char *>(full_payload->data() + 4),
-                          full_payload->size() - 4);
+                          reinterpret_cast<char *>(full_payload->data() + 8),
+                          full_payload->size() - 8);
 
                       state->current_message_frames.push_back(std::move(frame));
 
@@ -314,34 +332,12 @@ public:
     auto read_buf = std::make_shared<boost::asio::streambuf>();
     std::ostream os(writebuf.get());
 
-    auto create_frame = [&](std::string_view data, uint32_t stream_id, bool fin,
-                            uint8_t opcode) {
-      // Byte 0: FIN | RSV | Opcode (0x02 for binary)
-      uint8_t byte0 = (fin ? 0x80 : 0x00) | opcode & 0x02;
-      os.put(static_cast<char>(byte0));
-
-      // Byte 1: Mask(0) | Length(126 for 16-bit extended)
-      os.put(static_cast<char>(126));
-
-      // Extended Length: payload size + 4 bytes for StreamID
-      uint16_t ext_len = htons(static_cast<uint16_t>(data.size() + 4));
-      os.write(reinterpret_cast<const char *>(&ext_len), 2);
-
-      // Stream ID (4 bytes)
-      uint32_t net_sid = htonl(stream_id);
-      os.write(reinterpret_cast<const char *>(&net_sid), 4);
-
-      // Payload
-      std::cout << byte0 << "--" << ext_len << std::endl;
-      os.write(data.data(), data.size());
-    };
-
     // Frame 1: Partial data (FIN = 0)
-    create_frame("Stream part 1: Init", 1234, false, 0x02);
+    create_frame("Stream part 1: Init", 1234, false, 0x02, os);
     // Frame 2: Final data (FIN = 1)
-    create_frame("Stream part 2: End", 1234, true, 0x02);
+    create_frame("Stream part 2: End", 1234, true, 0x02, os);
 
-    create_frame("", 1234, true, 0x08);
+    create_frame("", 1234, true, 0x08, os);
 
     this->send_message(writebuf);
   };
