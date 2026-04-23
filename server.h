@@ -803,6 +803,8 @@ protected:
 
                  return res_frames;
                };
+                
+               auto write_head = std::make_shared<int>(0);
 
                std::shared_ptr<std::function<void(
                    std::shared_ptr<std::deque<std::vector<wss_frame>>>)>>
@@ -811,15 +813,15 @@ protected:
                    std::shared_ptr<std::deque<std::vector<wss_frame>>>)>>();
 
                *write_frame =
-                   [this, write_frame, message_counter_server](
+                   [this, write_frame, message_counter_server , write_head](
                        std::shared_ptr<std::deque<std::vector<wss_frame>>> DQ) {
-                     while (!DQ->empty()) {
+                     while(*write_head < (*DQ).size()) {
                        std::cout << "Started writing wss frame here ..."
                                  << std::endl;
-                       auto vec_msgs = DQ->front();
+                       auto vec_msgs = (*DQ)[*write_head];
                        for (auto i = 0; i < vec_msgs.size(); i++) {
                          // boost async write here send each chunk acordingly
-                         (*message_counter_server)++; // increase count of
+                         (*message_counter_server) = *message_counter_server + 1; // increase count of
                                                       // frame_id for reaply
                                                       // handler if required
                                                       // during read .
@@ -890,12 +892,13 @@ protected:
                              boost::asio::buffer(wire_buffer.data(),
                                                  wire_buffer.size()),
                              [DQ,
-                              write_frame , message_counter_server ](const boost::system::error_code &ec,
+                              write_frame , message_counter_server , write_head ](const boost::system::error_code &ec,
                                            size_t bytes) {
                                if (!ec) {
-                                 std::cout << "Chunk sent ... message server counter at:" << message_counter_server << std::endl;
-                               }
+                                 std::cout << "Chunk sent ... message server counter at:" << *message_counter_server << std::endl;
+                                }
                              });
+                          (*write_head)++;
                        }
                      }
                    };
@@ -1071,7 +1074,7 @@ protected:
                                            << std::endl;
                                  return;
                                }
-                               (*message_counter_server)++; // increment for
+                               *message_counter_server = *message_counter_server + 1; // increment for
                                                             // every time i have
                                                             // read the message
                                                             // for updation of
@@ -1088,7 +1091,7 @@ protected:
 
                                frame.LENGTH = state->header[1] & 0x7F;
 
-                               if (frame.LENGTH != 125) {
+                               if (frame.LENGTH > 125) {
 
                                  auto ext_len_buf =
                                      std::make_shared<uint16_t>();
@@ -1124,7 +1127,7 @@ protected:
                                                size_t) mutable {
                                              if (ec)
                                                return;
-                                             std::cout << "Reading payload"
+                                             std::cout << "Reading payload > 125"
                                                        << std::endl;
                                              // Extract StreamID
                                              uint32_t net_sid;
@@ -1157,6 +1160,8 @@ protected:
                                                       .back()
                                                       .OPCODE ==
                                                   static_cast<uint8_t>(11));
+
+                                             std::cout << "PONG message bool here .." << pong_message << std::endl;
 
                                              if (pong_message) {
 
@@ -1294,6 +1299,7 @@ protected:
                                                  timer->expires_after(
                                                      boost::asio::chrono::
                                                          seconds(45));
+                                                 std::cout << "Send the next ping ...  processed current pong" << std::endl;
                                                  try{
                                                    auto index = std::find_if(sender_DQ->begin(),sender_DQ->end(),[&](const std::vector<wss_frame> batch){
                                                         return batch.back().py.FRAME_ID <= frame.py.FRAME_ID;
@@ -1421,8 +1427,11 @@ protected:
                                        bool pong_message =
                                            (state->current_message_frames.back()
                                                 .OPCODE ==
-                                            static_cast<uint8_t>(11));
+                                            static_cast<uint8_t>(10));
 
+                                       
+                                      std::cout << "Pong processing bool .." << state->current_message_frames.back()
+                                                .OPCODE << static_cast<uint8_t>('A')<< std::endl;
                                        if (pong_message) {
 
                                          if (timer->expiry() <=
@@ -1537,6 +1546,7 @@ protected:
                                         });
 
                                          } else {
+                                           std::cout << "PING sent after prong processing .." << std::endl;
                                            (*send_ping)(
                                                sender_DQ,
                                                *message_counter_server);

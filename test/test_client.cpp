@@ -53,7 +53,10 @@ public:
   Wss_client(
       std::shared_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>
           soc)
-      : socket(soc) {};
+      : socket(soc) {
+    message_counter_client = std::make_shared<int>();
+    Sender_DQ = std::make_shared<std::deque<wss_frame>>();
+  };
 
   void connect() {
 
@@ -99,6 +102,7 @@ public:
                 if (resp.find("101 Switching Protocols") != std::string::npos) {
                   auto timer = std::make_shared<boost::asio::steady_timer>(
                       self->socket->get_executor());
+                  timer->expires_after(boost::asio::chrono::seconds(45));
                   timer->async_wait([timer](
                                         const boost::system::error_code &ec) {
                     if (!ec) {
@@ -112,10 +116,7 @@ public:
                                    "connection ...time_duration_passed:"
                                 << count << std::endl;
 
-                    } else {
-                      std::cout << "Timer cancelled or error: " << ec.message()
-                                << std::endl;
-                    }
+                    } 
                   });
                   self->read_from_linfr(timer);
                 }
@@ -161,7 +162,8 @@ public:
         *(self->socket), *write_buf,
         [self](const boost::system::error_code &ec, std::size_t bytes) {
           if (!ec) {
-            std::cout << "Sent message ... Message_counter at:" << self->message_counter_client << std::endl;
+            std::cout << "Sent message ... Message_counter at:"
+                      << *(self->message_counter_client) << std::endl;
           }
         });
   }
@@ -182,7 +184,8 @@ public:
               frame.OPCODE = state->header[0] & 0x0F;
               frame.FIN = (state->header[0] >> 7) & 0x01;
               frame.LENGTH = (state->header[1] & 0x7F);
-              if (frame.LENGTH != 125) {
+              std::cout << frame.LENGTH << std::endl;
+              if (frame.LENGTH > 125) {
                 auto ext_len_buf = std::make_shared<uint16_t>();
                 boost::asio::async_read(
                     *(self->socket), boost::asio::buffer(ext_len_buf.get(), 2),
@@ -193,6 +196,8 @@ public:
                         return;
                       (*(self->message_counter_client))++;
                       frame.EXTENDED_LENGTH = ntohs(*ext_len_buf);
+                      std::cout << "125> message processign .."
+                                << self->message_counter_client << std::endl;
 
                       auto full_payload =
                           std::make_shared<std::vector<uint8_t>>(
@@ -219,6 +224,8 @@ public:
                                                          8),
                                 full_payload->size() - 8);
 
+                            std::cout << "125> message processign .. payload "
+                                      << std::endl;
                             state->current_message_frames.push_back(
                                 std::move(frame));
 
@@ -252,6 +259,9 @@ public:
                             } else {
                               // Recursively read the next frame using the SAME
                               // state
+                              std::cout << "125> message processign ..read next"
+                                        << std::endl;
+
                               (*read_next_frame)();
                             }
                           });
@@ -283,7 +293,7 @@ public:
                           full_payload->size() - 8);
 
                       state->current_message_frames.push_back(std::move(frame));
-
+                      std::cout << "125 message processign .." << std::endl;
                       // Handle Ping (Opcode 0x09)
                       if (state->current_message_frames.back().OPCODE == 0x09) {
                         timer->expires_at(timer->expiry() +
@@ -312,6 +322,9 @@ public:
                       } else {
                         // Recursively read the next frame using the SAME
                         // state
+                        std::cout << "125 message processign .. read_next_frame"
+                                  << std::endl;
+
                         (*read_next_frame)();
                       }
                     });
@@ -481,7 +494,7 @@ int main(int argc, char *argv[]) {
                                      // to pass share_ptr into wss-client to
                                      // tell that this variable is required ,
                                      // fixxed
-                    wss_client->send_wss_binary_frames();
+                    // wss_client->send_wss_binary_frames();
                   }
                 }
 
