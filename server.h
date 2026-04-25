@@ -14,6 +14,7 @@
 #include <boost/asio/ssl.hpp>
 #include <boost/asio/streambuf.hpp>
 #include <boost/system/error_code.hpp>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <ctime>
@@ -787,12 +788,11 @@ protected:
                    frame.py.STREAM_ID = streamid;
                    frame.py.FRAME_ID = frame_id;
                    if (total_payload_size <= 125) {
-                     frame.LENGTH = static_cast<uint8_t>(total_payload_size);
+                     frame.LENGTH = (total_payload_size);
                      frame.EXTENDED_LENGTH = 0;
                    } else if (total_payload_size <= 65535) {
                      frame.LENGTH = 126;
-                     frame.EXTENDED_LENGTH =
-                         static_cast<uint16_t>(total_payload_size);
+                     frame.EXTENDED_LENGTH =(total_payload_size);
                    } else {
                      frame.LENGTH = 126;
                      frame.EXTENDED_LENGTH = 65535;
@@ -819,6 +819,7 @@ protected:
                        std::cout << "Started writing wss frame here ..."
                                  << std::endl;
                        auto vec_msgs = (*DQ)[*write_head];
+                       std::vector<uint8_t> wire_buffer;
                        for (auto i = 0; i < vec_msgs.size(); i++) {
                          // boost async write here send each chunk acordingly
                          (*message_counter_server) = *message_counter_server + 1; // increase count of
@@ -826,7 +827,7 @@ protected:
                                                       // handler if required
                                                       // during read .
                          vec_msgs[i].py.FRAME_ID = *(message_counter_server);
-                         std::vector<uint8_t> wire_buffer;
+                         
                          // [FIN(1) | RSV1(1) | RSV2(1) | RSV3(1) | OPCODE(4)]
                          uint8_t byte0 = 0;
                          byte0 |= (vec_msgs[i].FIN & 0x01) << 7;
@@ -837,17 +838,16 @@ protected:
                          wire_buffer.push_back(byte0);
 
                          uint8_t byte1 = 0;
-                         byte1 |= (vec_msgs[i].MASK & 0x01) << 7;
-
-                         uint8_t byte01 = 0;
-                         byte01 |=
-                             (static_cast<uint8_t>(vec_msgs[i].LENGTH) & 0x7F);
-                         wire_buffer.push_back(byte01);
-
-                         byte1 |= (static_cast<uint8_t>(
-                                       vec_msgs[i].EXTENDED_LENGTH) &
-                                   0x7F);
-                         wire_buffer.push_back(byte1);
+                         byte1 |= (vec_msgs[i].MASK & 0x01) << 7 | (static_cast<uint8_t>(vec_msgs[i].LENGTH) & 0x7F);
+                         std::cout <<"FRAME LENGTH / MSg:"<<  vec_msgs[i].LENGTH << std::endl;
+                         wire_buffer.push_back(byte1); 
+                         
+                         if(vec_msgs[i].LENGTH == 126){
+                           uint16_t ext = static_cast<uint16_t>(vec_msgs[i].EXTENDED_LENGTH);
+                           uint8_t* p = reinterpret_cast<uint8_t*>(&ext);
+                           wire_buffer.push_back(p[0]);
+                           wire_buffer.push_back(p[1]);
+                         }
 
                          uint32_t network_sid = htonl(vec_msgs[i].py.STREAM_ID);
                          uint8_t *sid_bytes =
@@ -887,7 +887,9 @@ protected:
                          std::cout << std::dec << "\n-------------"
                                    << std::endl;
 
-                         boost::asio::async_write(
+                         
+                        }
+                        boost::asio::async_write(
                              this->conn->conn_socket,
                              boost::asio::buffer(wire_buffer.data(),
                                                  wire_buffer.size()),
@@ -898,8 +900,7 @@ protected:
                                  std::cout << "Chunk sent ... message server counter at:" << *message_counter_server << std::endl;
                                 }
                              });
-                          (*write_head)++;
-                       }
+                       *write_head = *write_head + 1;
                      }
                    };
 
@@ -1293,12 +1294,15 @@ protected:
                                         }); 
 
                                                } else {
-                                                 (*send_ping)(
-                                                     sender_DQ,
-                                                     *message_counter_server);
-                                                 timer->expires_after(
-                                                     boost::asio::chrono::
-                                                         seconds(45));
+                                                 auto spacing_timer = std::make_shared<boost::asio::steady_timer>(this->conn->conn_socket.get_executor());
+                                                 spacing_timer->expires_after(boost::asio::chrono::seconds(5));
+                                                 spacing_timer->async_wait([send_ping,sender_DQ,message_counter_server,timer](const boost::system::error_code& ec){
+                                                       if(!ec){
+                                                          (*send_ping)(sender_DQ,*message_counter_server);
+                                                          timer->expires_after(boost::asio::chrono::seconds(45));
+
+                                                       }
+                                                     });
                                                  std::cout << "Send the next ping ...  processed current pong" << std::endl;
                                                  try{
                                                    auto index = std::find_if(sender_DQ->begin(),sender_DQ->end(),[&](const std::vector<wss_frame> batch){
@@ -1306,6 +1310,7 @@ protected:
                                                      });
                                                  auto index_int = index - sender_DQ->begin();
                                                  sender_DQ->erase(sender_DQ->begin(), sender_DQ->begin() + index_int);
+                                                 std::cout << "Clearing the queue till this frameId:" <<frame.py.FRAME_ID<< "-" << index_int; 
                                                  }catch(const std::error_code& er){
                                                    std::cout << "Error in clearing the sender dq on pong" << std::endl; 
                                                  }
@@ -1547,13 +1552,16 @@ protected:
 
                                          } else {
                                            std::cout << "PING sent after prong processing .." << std::endl;
-                                           (*send_ping)(
-                                               sender_DQ,
-                                               *message_counter_server);
-                                           timer->expires_after(
-                                               boost::asio::chrono::seconds(
-                                                   45));
-                                           try{
+                                                 auto spacing_timer = std::make_shared<boost::asio::steady_timer>(this->conn->conn_socket.get_executor());
+                                                 spacing_timer->expires_after(boost::asio::chrono::seconds(5));
+                                                 spacing_timer->async_wait([send_ping,sender_DQ,message_counter_server,timer](const boost::system::error_code& ec){
+                                                       if(!ec){
+                                                          (*send_ping)(sender_DQ,*message_counter_server);
+                                                          timer->expires_after(boost::asio::chrono::seconds(45));
+
+                                                       }
+                                                     });                                           
+                                                try{
                                                    auto index = std::find_if(sender_DQ->begin(),sender_DQ->end(),[&](const std::vector<wss_frame> batch){
                                                         return batch.back().py.FRAME_ID <= frame.py.FRAME_ID;
                                                      });

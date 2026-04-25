@@ -103,21 +103,20 @@ public:
                   auto timer = std::make_shared<boost::asio::steady_timer>(
                       self->socket->get_executor());
                   timer->expires_after(boost::asio::chrono::seconds(45));
-                  timer->async_wait([timer](
-                                        const boost::system::error_code &ec) {
-                    if (!ec) {
-                      auto expiry_time = timer->expiry();
-                      auto count =
-                          std::chrono::duration_cast<std::chrono::seconds>(
-                              expiry_time.time_since_epoch())
-                              .count();
+                  timer->async_wait(
+                      [timer](const boost::system::error_code &ec) {
+                        if (!ec) {
+                          auto expiry_time = timer->expiry();
+                          auto count =
+                              std::chrono::duration_cast<std::chrono::seconds>(
+                                  expiry_time.time_since_epoch())
+                                  .count();
 
-                      std::cout << "Ping was not recieved so we break "
-                                   "connection ...time_duration_passed:"
-                                << count << std::endl;
-
-                    } 
-                  });
+                          std::cout << "Ping was not recieved so we break "
+                                       "connection ...time_duration_passed:"
+                                    << count << std::endl;
+                        }
+                      });
                   self->read_from_linfr(timer);
                 }
               });
@@ -177,14 +176,16 @@ public:
     *read_next_frame = [self, state, timer, read_next_frame]() {
       boost::asio::async_read(
           *(self->socket), boost::asio::buffer(state->header, 2),
-          [self, state, timer,
-           read_next_frame](const boost::system::error_code &ec, std::size_t) {
+          [self, state, timer, read_next_frame](
+              const boost::system::error_code &ec, std::size_t bytes) {
             if (!ec) {
+              std::cout << bytes << std::endl;
               wss_frame frame;
               frame.OPCODE = state->header[0] & 0x0F;
               frame.FIN = (state->header[0] >> 7) & 0x01;
               frame.LENGTH = (state->header[1] & 0x7F);
-              std::cout << frame.LENGTH << std::endl;
+              std::cout << frame.OPCODE << "---" << frame.EXTENDED_LENGTH
+                        << "--" << frame.LENGTH << std::endl;
               if (frame.LENGTH > 125) {
                 auto ext_len_buf = std::make_shared<uint16_t>();
                 boost::asio::async_read(
@@ -281,7 +282,7 @@ public:
                                       std::size_t) mutable {
                       if (ec)
                         return;
-
+                      (*(self->message_counter_client))++;
                       uint32_t net_sid;
                       std::memcpy(&net_sid, full_payload->data(), 4);
                       uint32_t frame_id_sid;
