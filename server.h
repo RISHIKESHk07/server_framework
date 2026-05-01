@@ -1296,7 +1296,7 @@ protected:
                                                } else {
                                                  auto spacing_timer = std::make_shared<boost::asio::steady_timer>(this->conn->conn_socket.get_executor());
                                                  spacing_timer->expires_after(boost::asio::chrono::seconds(5));
-                                                 spacing_timer->async_wait([send_ping,sender_DQ,message_counter_server,timer](const boost::system::error_code& ec){
+                                                 spacing_timer->async_wait([send_ping,sender_DQ,message_counter_server,timer , spacing_timer](const boost::system::error_code& ec){
                                                        if(!ec){
                                                           (*send_ping)(sender_DQ,*message_counter_server);
                                                           timer->expires_after(boost::asio::chrono::seconds(45));
@@ -1554,8 +1554,9 @@ protected:
                                            std::cout << "PING sent after prong processing .." << std::endl;
                                                  auto spacing_timer = std::make_shared<boost::asio::steady_timer>(this->conn->conn_socket.get_executor());
                                                  spacing_timer->expires_after(boost::asio::chrono::seconds(5));
-                                                 spacing_timer->async_wait([send_ping,sender_DQ,message_counter_server,timer](const boost::system::error_code& ec){
+                                                 spacing_timer->async_wait([send_ping,sender_DQ,message_counter_server,timer,spacing_timer](const boost::system::error_code& ec){
                                                        if(!ec){
+                                                          std::cout << "Spacing timer done ... starting actual ping" << std::endl;
                                                           (*send_ping)(sender_DQ,*message_counter_server);
                                                           timer->expires_after(boost::asio::chrono::seconds(45));
 

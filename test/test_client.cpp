@@ -48,6 +48,7 @@ class Wss_client : public std::enable_shared_from_this<Wss_client> {
   };
 
   std::shared_ptr<std::deque<wss_frame>> Sender_DQ;
+  bool debug_replay = false;
 
 public:
   Wss_client(
@@ -233,6 +234,7 @@ public:
                             // Handle Ping (Opcode 0x09)
                             if (state->current_message_frames.back().OPCODE ==
                                 0x09) {
+                              if(!self->debug_replay){
                               timer->expires_at(
                                   timer->expiry() +
                                   boost::asio::chrono::seconds(45));
@@ -242,7 +244,22 @@ public:
 
                               self->create_frame("", 1234, 1, 0x0A,
                                                  os); // Send Pong
-                              self->send_message(write_buff);
+                              self->send_message(write_buff); }
+                              else {
+                              
+                              
+                              timer->expires_at(
+                                  timer->expiry() +
+                                  boost::asio::chrono::seconds(45));
+                              auto write_buff =
+                                  std::make_shared<boost::asio::streambuf>();
+                              std::ostream os(write_buff.get());
+
+                              self->create_frame("", 1234, 1, 0x0A,
+                                                 os); // Send Pong
+                              self->send_message(write_buff); 
+                              
+                              }
                             }
 
                             // Check if message is complete
@@ -496,6 +513,13 @@ int main(int argc, char *argv[]) {
                                      // tell that this variable is required ,
                                      // fixxed
                     // wss_client->send_wss_binary_frames();
+                  }else if (cmd=="wss-t1"){
+                    auto wss_socket = std::make_shared<
+                        boost::asio::ssl::stream<boost::asio::ip::tcp::socket>>(
+                        std::move(socket));
+                    auto wss_client = std::make_shared<Wss_client>(wss_socket);
+                    wss_client
+                        ->connect();
                   }
                 }
 
