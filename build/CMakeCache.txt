@@ -20,6 +20,10 @@ Boost_DIR:PATH=/usr/local/lib/cmake/Boost-1.90.0
 //Path to a file.
 Boost_INCLUDE_DIR:PATH=/usr/local/include
 
+Boost_LOG_LIBRARY_RELEASE:STRING=/usr/local/lib/libboost_log.dylib
+
+Boost_LOG_SETUP_LIBRARY_RELEASE:STRING=/usr/local/lib/libboost_log_setup.dylib
+
 //Path to a program.
 CMAKE_ADDR2LINE:FILEPATH=CMAKE_ADDR2LINE-NOTFOUND
 
@@ -222,6 +226,12 @@ PKG_CONFIG_ARGN:STRING=
 //pkg-config executable
 PKG_CONFIG_EXECUTABLE:FILEPATH=PKG_CONFIG_EXECUTABLE-NOTFOUND
 
+//Path to a file.
+SQLite3_INCLUDE_DIR:PATH=/Library/Frameworks/Mono.framework/Headers
+
+//Path to a library.
+SQLite3_LIBRARY:FILEPATH=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/libsqlite3.tbd
+
 //Value Computed by CMake
 boost_asio_tls_BINARY_DIR:STATIC=/Users/ravi/Desktop/server_framework/simple_wss/build
 
@@ -231,8 +241,41 @@ boost_asio_tls_IS_TOP_LEVEL:STATIC=ON
 //Value Computed by CMake
 boost_asio_tls_SOURCE_DIR:STATIC=/Users/ravi/Desktop/server_framework/simple_wss
 
+//The directory containing a CMake configuration file for boost_atomic.
+boost_atomic_DIR:PATH=/usr/local/lib/cmake/boost_atomic-1.90.0
+
+//The directory containing a CMake configuration file for boost_chrono.
+boost_chrono_DIR:PATH=/usr/local/lib/cmake/boost_chrono-1.90.0
+
+//The directory containing a CMake configuration file for boost_container.
+boost_container_DIR:PATH=/usr/local/lib/cmake/boost_container-1.90.0
+
+//The directory containing a CMake configuration file for boost_date_time.
+boost_date_time_DIR:PATH=/usr/local/lib/cmake/boost_date_time-1.90.0
+
+//The directory containing a CMake configuration file for boost_exception.
+boost_exception_DIR:PATH=/usr/local/lib/cmake/boost_exception-1.90.0
+
+//The directory containing a CMake configuration file for boost_filesystem.
+boost_filesystem_DIR:PATH=/usr/local/lib/cmake/boost_filesystem-1.90.0
+
 //The directory containing a CMake configuration file for boost_headers.
 boost_headers_DIR:PATH=/usr/local/lib/cmake/boost_headers-1.90.0
+
+//The directory containing a CMake configuration file for boost_log.
+boost_log_DIR:PATH=/usr/local/lib/cmake/boost_log-1.90.0
+
+//The directory containing a CMake configuration file for boost_log_setup.
+boost_log_setup_DIR:PATH=/usr/local/lib/cmake/boost_log_setup-1.90.0
+
+//The directory containing a CMake configuration file for boost_regex.
+boost_regex_DIR:PATH=/usr/local/lib/cmake/boost_regex-1.90.0
+
+//The directory containing a CMake configuration file for boost_serialization.
+boost_serialization_DIR:PATH=/usr/local/lib/cmake/boost_serialization-1.90.0
+
+//The directory containing a CMake configuration file for boost_thread.
+boost_thread_DIR:PATH=/usr/local/lib/cmake/boost_thread-1.90.0
 
 
 ########################
@@ -301,6 +344,8 @@ CMAKE_GENERATOR_INSTANCE:INTERNAL=
 CMAKE_GENERATOR_PLATFORM:INTERNAL=
 //Name of generator toolset.
 CMAKE_GENERATOR_TOOLSET:INTERNAL=
+//Test CMAKE_HAVE_LIBC_PTHREAD
+CMAKE_HAVE_LIBC_PTHREAD:INTERNAL=1
 //Source directory with the top level CMakeLists.txt file for this
 // project
 CMAKE_HOME_DIRECTORY:INTERNAL=/Users/ravi/Desktop/server_framework/simple_wss
@@ -371,9 +416,11 @@ CMAKE_UNAME:INTERNAL=/usr/bin/uname
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
 //Details about finding Boost
-FIND_PACKAGE_MESSAGE_DETAILS_Boost:INTERNAL=[/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake][ ][v1.90.0()]
+FIND_PACKAGE_MESSAGE_DETAILS_Boost:INTERNAL=[/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake][found components: log log_setup ][v1.90.0()]
 //Details about finding OpenSSL
 FIND_PACKAGE_MESSAGE_DETAILS_OpenSSL:INTERNAL=[/usr/local/lib/libcrypto.dylib][/usr/local/include][ ][v3.6.1()]
+//Details about finding SQLite3
+FIND_PACKAGE_MESSAGE_DETAILS_SQLite3:INTERNAL=[/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/libsqlite3.tbd][/Library/Frameworks/Mono.framework/Headers][v3.26.0()]
 //ADVANCED property for variable: OPENSSL_CRYPTO_LIBRARY
 OPENSSL_CRYPTO_LIBRARY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: OPENSSL_INCLUDE_DIR
@@ -384,6 +431,32 @@ OPENSSL_SSL_LIBRARY-ADVANCED:INTERNAL=1
 PKG_CONFIG_ARGN-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: PKG_CONFIG_EXECUTABLE
 PKG_CONFIG_EXECUTABLE-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: SQLite3_INCLUDE_DIR
+SQLite3_INCLUDE_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: SQLite3_LIBRARY
+SQLite3_LIBRARY-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: boost_atomic_DIR
+boost_atomic_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: boost_chrono_DIR
+boost_chrono_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: boost_container_DIR
+boost_container_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: boost_date_time_DIR
+boost_date_time_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: boost_exception_DIR
+boost_exception_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: boost_filesystem_DIR
+boost_filesystem_DIR-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: boost_headers_DIR
 boost_headers_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: boost_log_DIR
+boost_log_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: boost_log_setup_DIR
+boost_log_setup_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: boost_regex_DIR
+boost_regex_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: boost_serialization_DIR
+boost_serialization_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: boost_thread_DIR
+boost_thread_DIR-ADVANCED:INTERNAL=1
 

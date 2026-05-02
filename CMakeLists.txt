@@ -4,9 +4,9 @@ project(boost_asio_tls CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 # REMOVED system in find package , cmake stubs remove from version 1.89 
-find_package(Boost REQUIRED)
+find_package(Boost REQUIRED log log_setup)
 find_package(OpenSSL REQUIRED)
-
+find_package(Sqlite3 REQUIRED)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -26,8 +26,12 @@ add_custom_command(TARGET tls_server POST_BUILD
 target_include_directories(tls_server PRIVATE /usr/local/include)
 # This is the critical step for linking OpenSSL
 target_link_libraries(tls_server PRIVATE
+    Boost::log
+    Boost::log_setup
     Boost::boost
     OpenSSL::SSL
     OpenSSL::Crypto
+    Sqlite3
+    pthread
 )
 

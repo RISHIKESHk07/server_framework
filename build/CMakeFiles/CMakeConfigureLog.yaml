@@ -2478,3 +2478,1433 @@ events:
         - "/Network/Library/Frameworks"
         - "/System/Library/Frameworks"
 ...
+
+---
+events:
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/usr/local/share/cmake/Modules/FindSqlite3.cmake:67 (find_path)"
+      - "CMakeLists.txt:9 (find_package)"
+    mode: "path"
+    variable: "SQLite3_INCLUDE_DIR"
+    description: "Path to a file."
+    settings:
+      SearchFramework: "FIRST"
+      SearchAppBundle: "FIRST"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "sqlite3.h"
+    candidate_directories:
+      - "/Users/ravi/.local/share/nvim/mason/bin/"
+      - "/usr/local/bin/"
+      - "/System/Cryptexes/App/usr/bin/"
+      - "/usr/bin/"
+      - "/bin/"
+      - "/usr/sbin/"
+      - "/sbin/"
+      - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin/"
+      - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin/"
+      - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin/"
+      - "/opt/pmk/env/global/bin/"
+      - "/usr/local/share/dotnet/"
+      - "/Users/ravi/.dotnet/tools/"
+      - "/Library/Frameworks/Mono.framework/Versions/Current/Commands/"
+      - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/"
+      - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/"
+      - "/usr/local/include/"
+      - "/usr/local/"
+      - "/usr/include/"
+      - "/usr/"
+      - "/include/"
+      - "/usr/X11R6/include/"
+      - "/usr/X11R6/"
+      - "/usr/pkg/include/"
+      - "/usr/pkg/"
+      - "/opt/include/"
+      - "/opt/"
+      - "/sw/include/"
+      - "/sw/"
+      - "/opt/local/include/"
+      - "/opt/local/"
+      - "/usr/include/X11/"
+      - "/Users/ravi/Library/Frameworks/"
+      - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks/"
+      - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks/"
+      - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/"
+      - "/Library/Developer/CommandLineTools/Library/Frameworks/"
+      - "/Library/Frameworks/"
+      - "/Network/Library/Frameworks/"
+      - "/System/Library/Frameworks/"
+    found: "/Library/Frameworks/Mono.framework/Headers/"
+    search_context:
+      ENV{PATH}:
+        - "/Users/ravi/.local/share/nvim/mason/bin"
+        - "/usr/local/bin"
+        - "/System/Cryptexes/App/usr/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/usr/sbin"
+        - "/sbin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
+        - "/opt/pmk/env/global/bin"
+        - "/usr/local/share/dotnet"
+        - "~/.dotnet/tools"
+        - "/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+        - "/sw"
+        - "/opt/local"
+      CMAKE_SYSTEM_INCLUDE_PATH:
+        - "/usr/include/X11"
+      CMAKE_SYSTEM_FRAMEWORK_PATH:
+        - "~/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Frameworks"
+        - "/Network/Library/Frameworks"
+        - "/System/Library/Frameworks"
+  -
+    kind: "find-v1"
+    backtrace:
+      - "/usr/local/share/cmake/Modules/FindSqlite3.cmake:74 (find_library)"
+      - "CMakeLists.txt:9 (find_package)"
+    mode: "library"
+    variable: "SQLite3_LIBRARY"
+    description: "Path to a library."
+    settings:
+      SearchFramework: "FIRST"
+      SearchAppBundle: "FIRST"
+      CMAKE_FIND_USE_CMAKE_PATH: true
+      CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+      CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+      CMAKE_FIND_USE_INSTALL_PREFIX: true
+    names:
+      - "sqlite3"
+      - "sqlite"
+    candidate_directories:
+      - "/Users/ravi/.local/share/nvim/mason/bin/"
+      - "/usr/local/bin/"
+      - "/System/Cryptexes/App/usr/bin/"
+      - "/usr/bin/"
+      - "/bin/"
+      - "/usr/sbin/"
+      - "/sbin/"
+      - "/usr/local/share/dotnet/"
+      - "/Library/Frameworks/Mono.framework/Versions/Current/Commands/"
+      - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/"
+      - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/"
+      - "/usr/local/lib/"
+      - "/usr/local/"
+      - "/usr/lib/"
+      - "/usr/"
+      - "/opt/"
+      - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks/"
+      - "/Library/Developer/CommandLineTools/Library/Frameworks/"
+      - "/Library/Frameworks/"
+      - "/System/Library/Frameworks/"
+    searched_directories:
+      - "/Users/ravi/.local/share/nvim/mason/bin/"
+      - "/usr/local/bin/"
+      - "/System/Cryptexes/App/usr/bin/"
+      - "/usr/bin/"
+      - "/bin/"
+      - "/usr/sbin/"
+      - "/sbin/"
+      - "/usr/local/share/dotnet/"
+      - "/Library/Frameworks/Mono.framework/Versions/Current/Commands/"
+    found: "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/libsqlite3.tbd"
+    search_context:
+      ENV{PATH}:
+        - "/Users/ravi/.local/share/nvim/mason/bin"
+        - "/usr/local/bin"
+        - "/System/Cryptexes/App/usr/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/usr/sbin"
+        - "/sbin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
+        - "/opt/pmk/env/global/bin"
+        - "/usr/local/share/dotnet"
+        - "~/.dotnet/tools"
+        - "/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+        - "/sw"
+        - "/opt/local"
+      CMAKE_SYSTEM_LIBRARY_PATH:
+        - "/usr/lib/X11"
+      CMAKE_SYSTEM_FRAMEWORK_PATH:
+        - "~/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Frameworks"
+        - "/Network/Library/Frameworks"
+        - "/System/Library/Frameworks"
+...
+
+---
+events:
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "/usr/local/lib/cmake/boost_log-1.90.0/boost_log-config.cmake:102 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:141 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:262 (boost_find_component)"
+      - "/usr/local/share/cmake/Modules/FindBoost.cmake:610 (find_package)"
+      - "CMakeLists.txt:7 (find_package)"
+    name: "boost_atomic"
+    configs:
+      -
+        filename: "boost_atomicConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "boost_atomic-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "1.90.0"
+      version_complete: "1.90.0"
+      exact: true
+    settings:
+      required: "required_explicit"
+      quiet: true
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      hints:
+        - "/usr/local/lib/cmake"
+      names:
+        - "boost_atomic"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_atomicConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_atomic-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_atomicConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_atomic-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_atomic-1.90.0/boost_atomicConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "/usr/local/lib/cmake/boost_atomic-1.90.0/boost_atomic-config.cmake"
+      mode: "config"
+      version: "1.90.0"
+    search_context:
+      ENV{PATH}:
+        - "/Users/ravi/.local/share/nvim/mason/bin"
+        - "/usr/local/bin"
+        - "/System/Cryptexes/App/usr/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/usr/sbin"
+        - "/sbin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
+        - "/opt/pmk/env/global/bin"
+        - "/usr/local/share/dotnet"
+        - "~/.dotnet/tools"
+        - "/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+        - "/sw"
+        - "/opt/local"
+      CMAKE_SYSTEM_FRAMEWORK_PATH:
+        - "~/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Frameworks"
+        - "/Network/Library/Frameworks"
+        - "/System/Library/Frameworks"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "/usr/local/lib/cmake/boost_log-1.90.0/boost_log-config.cmake:102 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:141 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:262 (boost_find_component)"
+      - "/usr/local/share/cmake/Modules/FindBoost.cmake:610 (find_package)"
+      - "CMakeLists.txt:7 (find_package)"
+    name: "boost_chrono"
+    configs:
+      -
+        filename: "boost_chronoConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "boost_chrono-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "1.90.0"
+      version_complete: "1.90.0"
+      exact: true
+    settings:
+      required: "required_explicit"
+      quiet: true
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      hints:
+        - "/usr/local/lib/cmake"
+      names:
+        - "boost_chrono"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_chronoConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_chrono-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_chronoConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_chrono-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_chrono-1.90.0/boost_chronoConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "/usr/local/lib/cmake/boost_chrono-1.90.0/boost_chrono-config.cmake"
+      mode: "config"
+      version: "1.90.0"
+    search_context:
+      ENV{PATH}:
+        - "/Users/ravi/.local/share/nvim/mason/bin"
+        - "/usr/local/bin"
+        - "/System/Cryptexes/App/usr/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/usr/sbin"
+        - "/sbin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
+        - "/opt/pmk/env/global/bin"
+        - "/usr/local/share/dotnet"
+        - "~/.dotnet/tools"
+        - "/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+        - "/sw"
+        - "/opt/local"
+      CMAKE_SYSTEM_FRAMEWORK_PATH:
+        - "~/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Frameworks"
+        - "/Network/Library/Frameworks"
+        - "/System/Library/Frameworks"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "/usr/local/lib/cmake/boost_log-1.90.0/boost_log-config.cmake:102 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:141 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:262 (boost_find_component)"
+      - "/usr/local/share/cmake/Modules/FindBoost.cmake:610 (find_package)"
+      - "CMakeLists.txt:7 (find_package)"
+    name: "boost_container"
+    configs:
+      -
+        filename: "boost_containerConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "boost_container-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "1.90.0"
+      version_complete: "1.90.0"
+      exact: true
+    settings:
+      required: "required_explicit"
+      quiet: true
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      hints:
+        - "/usr/local/lib/cmake"
+      names:
+        - "boost_container"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_containerConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_container-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_containerConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_container-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_container-1.90.0/boost_containerConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "/usr/local/lib/cmake/boost_container-1.90.0/boost_container-config.cmake"
+      mode: "config"
+      version: "1.90.0"
+    search_context:
+      ENV{PATH}:
+        - "/Users/ravi/.local/share/nvim/mason/bin"
+        - "/usr/local/bin"
+        - "/System/Cryptexes/App/usr/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/usr/sbin"
+        - "/sbin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
+        - "/opt/pmk/env/global/bin"
+        - "/usr/local/share/dotnet"
+        - "~/.dotnet/tools"
+        - "/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+        - "/sw"
+        - "/opt/local"
+      CMAKE_SYSTEM_FRAMEWORK_PATH:
+        - "~/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Frameworks"
+        - "/Network/Library/Frameworks"
+        - "/System/Library/Frameworks"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "/usr/local/lib/cmake/boost_log-1.90.0/boost_log-config.cmake:102 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:141 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:262 (boost_find_component)"
+      - "/usr/local/share/cmake/Modules/FindBoost.cmake:610 (find_package)"
+      - "CMakeLists.txt:7 (find_package)"
+    name: "boost_date_time"
+    configs:
+      -
+        filename: "boost_date_timeConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "boost_date_time-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "1.90.0"
+      version_complete: "1.90.0"
+      exact: true
+    settings:
+      required: "required_explicit"
+      quiet: true
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      hints:
+        - "/usr/local/lib/cmake"
+      names:
+        - "boost_date_time"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_date_timeConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_date_time-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_date_timeConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_date_time-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_date_time-1.90.0/boost_date_timeConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "/usr/local/lib/cmake/boost_date_time-1.90.0/boost_date_time-config.cmake"
+      mode: "config"
+      version: "1.90.0"
+    search_context:
+      ENV{PATH}:
+        - "/Users/ravi/.local/share/nvim/mason/bin"
+        - "/usr/local/bin"
+        - "/System/Cryptexes/App/usr/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/usr/sbin"
+        - "/sbin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
+        - "/opt/pmk/env/global/bin"
+        - "/usr/local/share/dotnet"
+        - "~/.dotnet/tools"
+        - "/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+        - "/sw"
+        - "/opt/local"
+      CMAKE_SYSTEM_FRAMEWORK_PATH:
+        - "~/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Frameworks"
+        - "/Network/Library/Frameworks"
+        - "/System/Library/Frameworks"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "/usr/local/lib/cmake/boost_log-1.90.0/boost_log-config.cmake:102 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:141 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:262 (boost_find_component)"
+      - "/usr/local/share/cmake/Modules/FindBoost.cmake:610 (find_package)"
+      - "CMakeLists.txt:7 (find_package)"
+    name: "boost_exception"
+    configs:
+      -
+        filename: "boost_exceptionConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "boost_exception-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "1.90.0"
+      version_complete: "1.90.0"
+      exact: true
+    settings:
+      required: "required_explicit"
+      quiet: true
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      hints:
+        - "/usr/local/lib/cmake"
+      names:
+        - "boost_exception"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_exceptionConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_exception-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_exceptionConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_exception-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_exception-1.90.0/boost_exceptionConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "/usr/local/lib/cmake/boost_exception-1.90.0/boost_exception-config.cmake"
+      mode: "config"
+      version: "1.90.0"
+    search_context:
+      ENV{PATH}:
+        - "/Users/ravi/.local/share/nvim/mason/bin"
+        - "/usr/local/bin"
+        - "/System/Cryptexes/App/usr/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/usr/sbin"
+        - "/sbin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
+        - "/opt/pmk/env/global/bin"
+        - "/usr/local/share/dotnet"
+        - "~/.dotnet/tools"
+        - "/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+        - "/sw"
+        - "/opt/local"
+      CMAKE_SYSTEM_FRAMEWORK_PATH:
+        - "~/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Frameworks"
+        - "/Network/Library/Frameworks"
+        - "/System/Library/Frameworks"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "/usr/local/lib/cmake/boost_log-1.90.0/boost_log-config.cmake:102 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:141 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:262 (boost_find_component)"
+      - "/usr/local/share/cmake/Modules/FindBoost.cmake:610 (find_package)"
+      - "CMakeLists.txt:7 (find_package)"
+    name: "boost_filesystem"
+    configs:
+      -
+        filename: "boost_filesystemConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "boost_filesystem-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "1.90.0"
+      version_complete: "1.90.0"
+      exact: true
+    settings:
+      required: "required_explicit"
+      quiet: true
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      hints:
+        - "/usr/local/lib/cmake"
+      names:
+        - "boost_filesystem"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_filesystemConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_filesystem-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_filesystemConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_filesystem-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_filesystem-1.90.0/boost_filesystemConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "/usr/local/lib/cmake/boost_filesystem-1.90.0/boost_filesystem-config.cmake"
+      mode: "config"
+      version: "1.90.0"
+    search_context:
+      ENV{PATH}:
+        - "/Users/ravi/.local/share/nvim/mason/bin"
+        - "/usr/local/bin"
+        - "/System/Cryptexes/App/usr/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/usr/sbin"
+        - "/sbin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
+        - "/opt/pmk/env/global/bin"
+        - "/usr/local/share/dotnet"
+        - "~/.dotnet/tools"
+        - "/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+        - "/sw"
+        - "/opt/local"
+      CMAKE_SYSTEM_FRAMEWORK_PATH:
+        - "~/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Frameworks"
+        - "/Network/Library/Frameworks"
+        - "/System/Library/Frameworks"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "/usr/local/lib/cmake/boost_log-1.90.0/boost_log-config.cmake:102 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:141 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:262 (boost_find_component)"
+      - "/usr/local/share/cmake/Modules/FindBoost.cmake:610 (find_package)"
+      - "CMakeLists.txt:7 (find_package)"
+    name: "boost_regex"
+    configs:
+      -
+        filename: "boost_regexConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "boost_regex-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "1.90.0"
+      version_complete: "1.90.0"
+      exact: true
+    settings:
+      required: "required_explicit"
+      quiet: true
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      hints:
+        - "/usr/local/lib/cmake"
+      names:
+        - "boost_regex"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_regexConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_regex-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_regexConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_regex-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_regex-1.90.0/boost_regexConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "/usr/local/lib/cmake/boost_regex-1.90.0/boost_regex-config.cmake"
+      mode: "config"
+      version: "1.90.0"
+    search_context:
+      ENV{PATH}:
+        - "/Users/ravi/.local/share/nvim/mason/bin"
+        - "/usr/local/bin"
+        - "/System/Cryptexes/App/usr/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/usr/sbin"
+        - "/sbin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
+        - "/opt/pmk/env/global/bin"
+        - "/usr/local/share/dotnet"
+        - "~/.dotnet/tools"
+        - "/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+        - "/sw"
+        - "/opt/local"
+      CMAKE_SYSTEM_FRAMEWORK_PATH:
+        - "~/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Frameworks"
+        - "/Network/Library/Frameworks"
+        - "/System/Library/Frameworks"
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/local/share/cmake/Modules/Internal/CheckSourceCompiles.cmake:104 (try_compile)"
+      - "/usr/local/share/cmake/Modules/CheckCXXSourceCompiles.cmake:103 (cmake_check_source_compiles)"
+      - "/usr/local/share/cmake/Modules/FindThreads.cmake:162 (check_cxx_source_compiles)"
+      - "/usr/local/share/cmake/Modules/FindThreads.cmake:226 (_threads_check_libc)"
+      - "/usr/local/share/cmake/Modules/CMakeFindDependencyMacro.cmake:93 (find_package)"
+      - "/usr/local/share/cmake/Modules/CMakeFindDependencyMacro.cmake:125 (__find_dependency_common)"
+      - "/usr/local/lib/cmake/boost_thread-1.90.0/boost_thread-config.cmake:118 (find_dependency)"
+      - "/usr/local/lib/cmake/boost_log-1.90.0/boost_log-config.cmake:102 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:141 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:262 (boost_find_component)"
+      - "/usr/local/share/cmake/Modules/FindBoost.cmake:610 (find_package)"
+      - "CMakeLists.txt:7 (find_package)"
+    directories:
+      source: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/CMakeScratch/TryCompile-tRvaWi"
+      binary: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/CMakeScratch/TryCompile-tRvaWi"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: ""
+      CMAKE_CXX_FLAGS_DEBUG: "-g"
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_OSX_ARCHITECTURES: ""
+      CMAKE_OSX_DEPLOYMENT_TARGET: ""
+      CMAKE_OSX_SYSROOT: ""
+    buildResult:
+      variable: "CMAKE_HAVE_LIBC_PTHREAD"
+      cached: true
+      stdout: |
+        Change Dir: '/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/CMakeScratch/TryCompile-tRvaWi'
+        
+        Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/local/bin/gmake -f Makefile cmTC_243cf/fast
+        gmake[1]: Entering directory '/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/CMakeScratch/TryCompile-tRvaWi'
+        /usr/local/bin/gmake  -f CMakeFiles/cmTC_243cf.dir/build.make CMakeFiles/cmTC_243cf.dir/build
+        gmake[2]: Entering directory '/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/CMakeScratch/TryCompile-tRvaWi'
+        Building CXX object CMakeFiles/cmTC_243cf.dir/src.cxx.o
+        /usr/bin/c++ -DCMAKE_HAVE_LIBC_PTHREAD  -std=gnu++17 -MD -MT CMakeFiles/cmTC_243cf.dir/src.cxx.o -MF CMakeFiles/cmTC_243cf.dir/src.cxx.o.d -o CMakeFiles/cmTC_243cf.dir/src.cxx.o -c /Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/CMakeScratch/TryCompile-tRvaWi/src.cxx
+        Linking CXX executable cmTC_243cf
+        /usr/local/bin/cmake -E cmake_link_script CMakeFiles/cmTC_243cf.dir/link.txt --verbose=1
+        /usr/bin/c++ -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/cmTC_243cf.dir/src.cxx.o -o cmTC_243cf
+        gmake[2]: Leaving directory '/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/CMakeScratch/TryCompile-tRvaWi'
+        gmake[1]: Leaving directory '/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/CMakeScratch/TryCompile-tRvaWi'
+        
+      exitCode: 0
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "/usr/local/lib/cmake/boost_log-1.90.0/boost_log-config.cmake:102 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:141 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:262 (boost_find_component)"
+      - "/usr/local/share/cmake/Modules/FindBoost.cmake:610 (find_package)"
+      - "CMakeLists.txt:7 (find_package)"
+    name: "boost_thread"
+    configs:
+      -
+        filename: "boost_threadConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "boost_thread-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "1.90.0"
+      version_complete: "1.90.0"
+      exact: true
+    settings:
+      required: "required_explicit"
+      quiet: true
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      hints:
+        - "/usr/local/lib/cmake"
+      names:
+        - "boost_thread"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_threadConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_thread-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_threadConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_thread-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_thread-1.90.0/boost_threadConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "/usr/local/lib/cmake/boost_thread-1.90.0/boost_thread-config.cmake"
+      mode: "config"
+      version: "1.90.0"
+    search_context:
+      ENV{PATH}:
+        - "/Users/ravi/.local/share/nvim/mason/bin"
+        - "/usr/local/bin"
+        - "/System/Cryptexes/App/usr/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/usr/sbin"
+        - "/sbin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
+        - "/opt/pmk/env/global/bin"
+        - "/usr/local/share/dotnet"
+        - "~/.dotnet/tools"
+        - "/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+        - "/sw"
+        - "/opt/local"
+      CMAKE_SYSTEM_FRAMEWORK_PATH:
+        - "~/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Frameworks"
+        - "/Network/Library/Frameworks"
+        - "/System/Library/Frameworks"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:141 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:262 (boost_find_component)"
+      - "/usr/local/share/cmake/Modules/FindBoost.cmake:610 (find_package)"
+      - "CMakeLists.txt:7 (find_package)"
+    name: "boost_log"
+    configs:
+      -
+        filename: "boost_logConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "boost_log-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "1.90.0"
+      version_complete: "1.90.0"
+      exact: true
+    settings:
+      required: "required_explicit"
+      quiet: true
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      hints:
+        - "/usr/local/lib/cmake"
+      names:
+        - "boost_log"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_logConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_log-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_logConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_log-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_log_setup-1.90.0/boost_logConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_log_setup-1.90.0/boost_log-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_log-1.90.0/boost_logConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "/usr/local/lib/cmake/boost_log-1.90.0/boost_log-config.cmake"
+      mode: "config"
+      version: "1.90.0"
+    search_context:
+      ENV{PATH}:
+        - "/Users/ravi/.local/share/nvim/mason/bin"
+        - "/usr/local/bin"
+        - "/System/Cryptexes/App/usr/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/usr/sbin"
+        - "/sbin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
+        - "/opt/pmk/env/global/bin"
+        - "/usr/local/share/dotnet"
+        - "~/.dotnet/tools"
+        - "/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+        - "/sw"
+        - "/opt/local"
+      CMAKE_SYSTEM_FRAMEWORK_PATH:
+        - "~/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Frameworks"
+        - "/Network/Library/Frameworks"
+        - "/System/Library/Frameworks"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "/usr/local/lib/cmake/boost_log_setup-1.90.0/boost_log_setup-config.cmake:102 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:141 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:262 (boost_find_component)"
+      - "/usr/local/share/cmake/Modules/FindBoost.cmake:610 (find_package)"
+      - "CMakeLists.txt:7 (find_package)"
+    name: "boost_serialization"
+    configs:
+      -
+        filename: "boost_serializationConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "boost_serialization-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "1.90.0"
+      version_complete: "1.90.0"
+      exact: true
+    settings:
+      required: "required_explicit"
+      quiet: true
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      hints:
+        - "/usr/local/lib/cmake"
+      names:
+        - "boost_serialization"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_serializationConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_serialization-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_serializationConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_serialization-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_serialization-1.90.0/boost_serializationConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "/usr/local/lib/cmake/boost_serialization-1.90.0/boost_serialization-config.cmake"
+      mode: "config"
+      version: "1.90.0"
+    search_context:
+      ENV{PATH}:
+        - "/Users/ravi/.local/share/nvim/mason/bin"
+        - "/usr/local/bin"
+        - "/System/Cryptexes/App/usr/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/usr/sbin"
+        - "/sbin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
+        - "/opt/pmk/env/global/bin"
+        - "/usr/local/share/dotnet"
+        - "~/.dotnet/tools"
+        - "/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+        - "/sw"
+        - "/opt/local"
+      CMAKE_SYSTEM_FRAMEWORK_PATH:
+        - "~/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Frameworks"
+        - "/Network/Library/Frameworks"
+        - "/System/Library/Frameworks"
+  -
+    kind: "find_package-v1"
+    backtrace:
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:141 (find_package)"
+      - "/usr/local/lib/cmake/Boost-1.90.0/BoostConfig.cmake:262 (boost_find_component)"
+      - "/usr/local/share/cmake/Modules/FindBoost.cmake:610 (find_package)"
+      - "CMakeLists.txt:7 (find_package)"
+    name: "boost_log_setup"
+    configs:
+      -
+        filename: "boost_log_setupConfig.cmake"
+        kind: "cmake"
+      -
+        filename: "boost_log_setup-config.cmake"
+        kind: "cmake"
+    version_request:
+      version: "1.90.0"
+      version_complete: "1.90.0"
+      exact: true
+    settings:
+      required: "required_explicit"
+      quiet: true
+      global: false
+      policy_scope: true
+      bypass_provider: false
+      hints:
+        - "/usr/local/lib/cmake"
+      names:
+        - "boost_log_setup"
+      path_suffixes:
+        - ""
+      paths:
+        CMAKE_FIND_USE_CMAKE_PATH: true
+        CMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH: true
+        CMAKE_FIND_USE_CMAKE_SYSTEM_PATH: true
+        CMAKE_FIND_USE_INSTALL_PREFIX: true
+        CMAKE_FIND_USE_PACKAGE_ROOT_PATH: true
+        CMAKE_FIND_USE_CMAKE_PACKAGE_REGISTRY: true
+        CMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY: true
+        CMAKE_FIND_ROOT_PATH_MODE: "BOTH"
+    candidates:
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_log_setupConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles/pkgRedirects/boost_log_setup-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_log_setupConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_log_setup-config.cmake"
+        mode: "config"
+        reason: "no_exist"
+      -
+        path: "/usr/local/lib/cmake/boost_log_setup-1.90.0/boost_log_setupConfig.cmake"
+        mode: "config"
+        reason: "no_exist"
+    found:
+      path: "/usr/local/lib/cmake/boost_log_setup-1.90.0/boost_log_setup-config.cmake"
+      mode: "config"
+      version: "1.90.0"
+    search_context:
+      ENV{PATH}:
+        - "/Users/ravi/.local/share/nvim/mason/bin"
+        - "/usr/local/bin"
+        - "/System/Cryptexes/App/usr/bin"
+        - "/usr/bin"
+        - "/bin"
+        - "/usr/sbin"
+        - "/sbin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin"
+        - "/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin"
+        - "/opt/pmk/env/global/bin"
+        - "/usr/local/share/dotnet"
+        - "~/.dotnet/tools"
+        - "/Library/Frameworks/Mono.framework/Versions/Current/Commands"
+      CMAKE_INSTALL_PREFIX: "/usr/local"
+      CMAKE_SYSTEM_PREFIX_PATH:
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr"
+        - "/"
+        - "/usr/local"
+        - "/usr/local"
+        - "/usr/X11R6"
+        - "/usr/pkg"
+        - "/opt"
+        - "/sw"
+        - "/opt/local"
+      CMAKE_SYSTEM_FRAMEWORK_PATH:
+        - "~/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Network/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Developer/CommandLineTools/Library/Frameworks"
+        - "/Library/Frameworks"
+        - "/Network/Library/Frameworks"
+        - "/System/Library/Frameworks"
+...

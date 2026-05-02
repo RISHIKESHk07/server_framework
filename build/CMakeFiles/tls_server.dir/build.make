@@ -95,8 +95,18 @@ tls_server_EXTERNAL_OBJECTS =
 
 tls_server: CMakeFiles/tls_server.dir/server.cpp.o
 tls_server: CMakeFiles/tls_server.dir/build.make
+tls_server: /usr/local/lib/libboost_log_setup.dylib
 tls_server: /usr/local/lib/libssl.dylib
 tls_server: /usr/local/lib/libcrypto.dylib
+tls_server: /usr/local/lib/libboost_log.dylib
+tls_server: /usr/local/lib/libboost_filesystem.dylib
+tls_server: /usr/local/lib/libboost_regex.dylib
+tls_server: /usr/local/lib/libboost_thread.dylib
+tls_server: /usr/local/lib/libboost_atomic.dylib
+tls_server: /usr/local/lib/libboost_chrono.dylib
+tls_server: /usr/local/lib/libboost_container.dylib
+tls_server: /usr/local/lib/libboost_date_time.dylib
+tls_server: /usr/local/lib/libboost_serialization.dylib
 tls_server: CMakeFiles/tls_server.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/ravi/Desktop/server_framework/simple_wss/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable tls_server"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/tls_server.dir/link.txt --verbose=$(VERBOSE)

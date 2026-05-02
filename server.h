@@ -3,6 +3,12 @@
 #include "boost/asio/post.hpp"
 #include "boost/asio/steady_timer.hpp"
 #include "boost/asio/write.hpp"
+#include "boost/log/sinks/basic_sink_backend.hpp"
+#include "boost/log/sinks/frontend_requirements.hpp"
+#include "boost/log/sinks/sync_frontend.hpp"
+#include "sqlite3.h"
+#include "boost/smart_ptr/make_shared_object.hpp"
+#include "boost/smart_ptr/shared_ptr.hpp"
 #include "boost/system/detail/error_code.hpp"
 #include <algorithm>
 #include <boost/asio.hpp>
@@ -14,6 +20,19 @@
 #include <boost/asio/ssl.hpp>
 #include <boost/asio/streambuf.hpp>
 #include <boost/system/error_code.hpp>
+#include <boost/log/trivial.hpp>
+#include <boost/log/attributes.hpp>
+#include <boost/log/core.hpp>
+#include <boost/log/sources/severity_logger.hpp>
+#include <boost/log/sources/logger.hpp>
+#include <boost/log/utility/setup/file.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/attributes/constant.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/log/sources/severity_feature.hpp>
+#include <boost/log/sources/severity_logger.hpp>
+#include <boost/log/attributes/scoped_attribute.hpp>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -139,6 +158,84 @@ protected:
             std::cout << "404 Page " << std::endl;
           };
   bool keepALive = 0;
+  
+  enum log_level {INFO,FATAL,DEBUG};
+
+  boost::log::sources::severity_logger<log_level> lg;
+
+  
+  class Logger_backend: public boost::log::sinks::basic_sink_backend<boost::log::sinks::concurrent_feeding>{
+    sqlite3* db;
+    public:
+    Logger_backend(const char* str){
+      if(sqlite3_open(str, &db) != SQLITE_OK){
+        throw std::runtime_error("Failed to open SQLite database");
+      }
+      const char* schema = "CREATE TABLE IF NOT EXISTS logs ("
+                             "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                             "severity TEXT, thread_id TEXT, global_id INTEGER, "
+                             "user_id TEXT, timestamp TEXT, message TEXT);";
+      sqlite3_exec(db, schema, nullptr, nullptr, nullptr);
+    }
+    ~Logger_backend() { sqlite3_close(db); }
+
+
+  void consume(boost::log::record_view const& rec) {
+    
+    auto sev = rec[boost::log::trivial::severity];
+    auto msg = rec[boost::log::expressions::smessage];
+    auto ts  = boost::log::extract<boost::posix_time::ptime>("TimeStamp", rec);
+    auto tid = boost::log::extract<boost::log::attributes::current_thread_id::value_type>("ThreadID", rec);
+    auto uid = boost::log::extract<std::string>("UserID", rec);
+    auto gid = boost::log::extract<unsigned int>("GlobalID", rec);
+
+    std::stringstream ss_sev, ss_tid, ss_ts , ss_uid ,ss_gid;
+    
+    if (sev) ss_sev << sev.get();
+    if (tid) ss_tid << tid.get();
+    if (ts)  ss_ts << boost::posix_time::to_iso_extended_string(ts.get());
+    if (uid) ss_uid << uid.get();
+    if(gid) ss_gid << gid.get();
+
+    
+    sqlite3_stmt* stmt;
+    const char* sql = "INSERT INTO logs (severity, thread_id, global_id , user_id , timestamp, message) VALUES (?, ?, ?, ?, ?, ?);";
+    sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+
+    
+    std::string s1 = ss_sev.str();
+    std::string s2 = ss_tid.str();
+    std::string s3 = ss_uid.str();
+    std::string s4 = ss_gid.str();
+    std::string s5 = ss_ts.str();
+    std::string s6 = msg.get();
+
+    sqlite3_bind_text(stmt, 1, s1.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, s2.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, s3.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, s4.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 5, s5.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 6, s6.c_str(), -1, SQLITE_TRANSIENT);
+
+
+
+
+    sqlite3_step(stmt);
+    sqlite3_finalize(stmt);
+  }
+  };
+
+  void init_logger_metadata(){
+        typedef boost::log::sinks::synchronous_sink<Logger_backend> text_sink;
+        boost::shared_ptr< boost::log::core > core = boost::log::core::get();
+        auto backend = boost::make_shared<Logger_backend>("logs.db");
+        boost::shared_ptr<text_sink> t_sink = boost::make_shared<text_sink>(backend);
+        core->add_sink(t_sink);
+        boost::log::add_common_attributes();
+        core->add_global_attribute("UserID", boost::log::attributes::constant<std::string>("user"));
+        core->add_global_attribute("GlobalID", boost::log::attributes::counter<unsigned int>(1));
+
+  }
   void load_ssl_options() {
     try {
       const char *cert_path = "server.crt";
@@ -1518,7 +1615,7 @@ protected:
                                          size_t) mutable {
                                        if (ec)
                                          return;
-                                       std::cout << "Reading Replay state pong payload"
+                                      std::cout << "Reading Replay state pong payload"
                                                  << std::endl;
                                        // Extract StreamID
                                        uint32_t net_sid;
@@ -1748,11 +1845,14 @@ protected:
         [init_id, this](const boost::system::error_code &error,
                         boost::asio::ip::tcp::socket peer) {
           if (!error) {
+            std::string user_id_str = std::to_string(init_id);
+            auto user_attr = boost::log::add_scoped_thread_attribute("UserID", boost::log::attributes::constant<std::string>(user_id_str));
+            BOOST_LOG_SEV(lg,DEBUG) << "Added User :" << user_id_str ;
             auto new_conn = std::make_shared<Connection>(
                 init_id, "",
                 boost::asio::ssl::stream<boost::asio::ip::tcp::socket>(
                     std::move(peer), this->ssl_context));
-            // new_conn->conn_socket.set_verify_mode(boost::asio::ssl::verify_none);
+            // new_conn->conn_socket.set_verify_mode(boost::asio::ssl::verify_none); 
             TLS_handshake_connection_worker(new_conn);
             boost::asio::post(this->io_context, [this, init_id]() mutable {
               auto temp_id = init_id + 1;
@@ -1940,6 +2040,7 @@ public:
       : host(host), port(port),
         server_endpoint(boost::asio::ip::make_address_v4(host), port),
         acceptor(io_context) {
+    init_logger_metadata();
     load_ssl_options();
     int init_id = 123;
     // primed the acceptor object
